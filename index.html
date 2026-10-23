@@ -1,0 +1,1083 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Luminous Audit 프로토타입</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600&display=swap">
+<style>
+/* Layout: 시안 비교용 셸. 상단 컨트롤바(A/B/C 전환, 해볼 일 체크리스트) + 1440x810 앱 스테이지(화면 폭에 맞춰 축소). 제품 UI는 라이트 단일 룩으로 고정. */
+:root{--bg:#EEF0F4;--surface:#FFFFFF;--panel:#F1F3F6;--sub:#F6F7F9;--line:#D5D8DE;--hair:#ECEEF2;--ink:#14171D;--mut:#5F6672;--acc:#2F6BFF;--acc-t:#EAF0FF;--acc-x:#1F4FCC;--ok:#1E7A4F;--warn:#B4412A;--font:'IBM Plex Sans KR','Apple SD Gothic Neo','Malgun Gothic',Arial,sans-serif;color-scheme:light}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink)}
+body{margin:0;font-family:var(--font);font-size:15px;padding-block:16px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+button{font-family:inherit;color:inherit}
+.ctl{max-width:1440px;margin:0 auto 12px;display:flex;gap:12px 20px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+.ctl h1{font-size:17px;margin:0;font-weight:600}
+.lay{display:flex;gap:6px;flex-wrap:wrap}
+.lay button{all:unset;cursor:pointer;padding:8px 14px;border-radius:10px;background:var(--surface);box-shadow:0 0 0 1px var(--line);font-size:14px;line-height:20px}
+.lay button b{font-weight:600}
+.lay button.on{background:var(--ink);color:#fff;box-shadow:none}
+.lay button:focus-visible,.app button:focus-visible,.app input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.tasks{max-width:1440px;margin:0 auto 12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:14px;color:var(--mut)}
+.tasks span.t{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border-radius:99px;background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+.tasks span.t.d{color:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+.tasks button{all:unset;cursor:pointer;margin-left:auto;padding:4px 10px;border-radius:99px;box-shadow:0 0 0 1px var(--line);background:var(--surface)}
+.fit{max-width:1440px;margin:0 auto;position:relative;overflow:hidden;border-radius:16px;box-shadow:0 0 0 1px var(--line),0 18px 40px rgba(20,23,29,.08)}
+.app{position:absolute;left:0;top:0;width:1440px;height:810px;transform-origin:0 0;background:var(--surface);overflow:hidden;font-family:var(--font);font-size:15px;line-height:22px;color:var(--ink)}
+.abs{position:absolute}
+.top{position:absolute;left:0;top:0;width:1440px;height:48px;border-bottom:1px solid var(--hair);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:var(--surface);z-index:5}
+.top.c{height:56px}
+.logo{display:flex;align-items:center;gap:10px;font-size:15px;width:320px}
+.logo i{width:10px;height:10px;border-radius:50%;background:var(--acc)}
+.logo span{color:var(--mut)}
+.seg{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--panel);align-items:center}
+.seg button{all:unset;cursor:pointer;height:30px;padding:0 14px;border-radius:9px;display:flex;gap:8px;align-items:center;font-size:15px;color:var(--mut)}
+.seg button.on{background:var(--surface);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px #E3E6EB,0 2px 6px rgba(20,23,29,.06)}
+.seg .n{min-width:22px;height:22px;border-radius:11px;background:#E3E6EB;color:var(--mut);font-size:14px;display:inline-flex;align-items:center;justify-content:center;font-weight:500}
+.seg .on .n{background:var(--acc);color:#fff}
+.seg .arr{color:#A5A9B3;padding:0 2px}
+.right-top{width:320px;display:flex;justify-content:flex-end;align-items:center;gap:16px;font-size:14px;color:var(--mut)}
+.av{width:28px;height:28px;border-radius:50%;background:var(--panel);box-shadow:0 0 0 1px #E3E6EB}
+.left{position:absolute;left:0;top:48px;width:240px;height:762px;border-right:1px solid var(--hair);padding:12px;overflow:hidden;background:var(--surface)}
+.cap{font-size:14px;color:var(--mut)}
+.sec-h{font-size:14px;color:var(--mut);padding:14px 12px 6px}
+.li{all:unset;box-sizing:border-box;cursor:pointer;display:flex;width:100%;justify-content:space-between;align-items:center;gap:8px;min-height:36px;padding:6px 12px;border-radius:10px;font-size:15px;line-height:20px}
+.li:hover{background:var(--sub)}
+.li>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.li.on{background:var(--panel);font-weight:600}
+.li.done{color:var(--mut)}
+.li small{flex-shrink:0;font-size:14px;color:var(--mut);font-weight:400;white-space:nowrap}
+.li .dot{width:6px;height:6px;border-radius:50%;background:var(--acc);margin-right:8px;display:inline-block}
+.ro{display:flex;justify-content:space-between;padding:6px 12px;font-size:15px;color:var(--mut)}
+.canvas{position:absolute;top:48px;overflow:hidden;background-color:#FBFBFC;background-image:radial-gradient(#DDE0E6 1px,transparent 1.2px);background-size:24px 24px}
+.card{position:absolute;border-radius:14px;background:var(--surface);box-shadow:0 0 0 1px #E3E6EB;padding:14px 16px;font-size:14px;line-height:20px;color:var(--mut);display:flex;flex-direction:column;gap:6px;transition:filter .2s,opacity .2s,box-shadow .2s;cursor:pointer;text-align:left}
+.card b{font-size:16px;line-height:24px;font-weight:600;color:var(--ink)}
+.card.dim{filter:blur(2.5px);opacity:.6}
+.card.dim:hover{filter:blur(1px);opacity:.85}
+.card.sel{box-shadow:0 0 0 2px var(--acc),0 10px 28px rgba(47,107,255,.18);cursor:default}
+.card.noclick{cursor:default}
+.hl{background:var(--acc-t);color:var(--ink);border-radius:6px;padding:3px 7px;transition:background .3s}
+.hl.flash{background:#BFD3FF}
+.tag{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:99px;font-size:14px;background:var(--panel);color:var(--mut);white-space:nowrap}
+.tag.p{background:var(--acc-t);color:var(--acc-x)}
+.tag.g{background:#E3F3EB;color:var(--ok)}
+.chipx{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:8px;font-size:14px;background:var(--acc-t);color:var(--acc-x);white-space:nowrap}
+.slash{all:unset;cursor:pointer;display:inline-flex;align-items:center;height:28px;padding:0 12px;border-radius:99px;font-size:14px;background:var(--sub);box-shadow:0 0 0 1px #E3E6EB;white-space:nowrap}
+.slash:hover{background:var(--panel)}
+.ddb{all:unset;box-sizing:border-box;cursor:pointer;width:100%;height:44px;border-radius:12px;background:var(--sub);box-shadow:0 0 0 1px #E3E6EB;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-weight:500;font-size:14px}
+.ddl{margin-top:6px;border-radius:12px;box-shadow:0 0 0 1px #E3E6EB,0 12px 28px rgba(20,23,29,.12);background:#fff;padding:6px;display:flex;flex-direction:column;gap:2px;position:relative;z-index:5}
+.ddl .g{font-size:13px;color:var(--mut);padding:8px 8px 2px}
+.ddl button{all:unset;cursor:pointer;padding:8px;border-radius:8px;font-size:14px}
+.ddl button:hover{background:var(--panel)}
+.ddl button.on{background:var(--acc-t);color:var(--acc-x);font-weight:600}
+.rE{position:absolute;left:1016px;top:48px;width:424px;height:762px;border-left:1px solid var(--hair);background:var(--surface);display:flex;flex-direction:column}
+.ecat{display:flex;gap:2px;padding:6px 12px 0;border-bottom:1px solid var(--hair)}
+.ecat button{all:unset;cursor:pointer;padding:10px 10px;font-size:14px;color:var(--mut);border-bottom:2px solid transparent;display:flex;gap:6px;align-items:center}
+.ecat button.on{color:var(--ink);font-weight:600;border-bottom-color:var(--acc)}
+.ecat .n{font-size:12px;background:var(--panel);border-radius:9px;padding:0 6px;line-height:18px;color:var(--mut)}
+.esec-h{display:flex;justify-content:space-between;align-items:center;padding:12px 16px 6px;font-weight:600;font-size:14px}
+.elist{overflow:auto;padding:0 16px 8px;display:flex;flex-direction:column;gap:8px;flex:0 1 auto;max-height:250px}
+.econv{overflow:auto;padding:0 16px 8px;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+.egrp{border-radius:14px;box-shadow:0 0 0 1px #E3E6EB}
+.egrp .eh{all:unset;box-sizing:border-box;cursor:pointer;width:100%;display:flex;align-items:center;gap:8px;padding:10px 12px}
+.egrp .eb{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
+.hint{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-size:14px;line-height:20px;color:var(--mut);padding:2px 0}
+.hint:hover{color:var(--ink)}
+.btn{all:unset;box-sizing:border-box;cursor:pointer;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:15px;padding:0 16px;white-space:nowrap}
+.btn.pri{background:var(--acc);color:#fff;font-weight:600}
+.btn.pri:hover{background:#2459D6}
+.btn.sec{background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+.btn.sec:hover{background:var(--sub)}
+.btn[disabled]{opacity:.45;cursor:default}
+.glass{background:linear-gradient(180deg,rgba(255,255,255,.66),rgba(255,255,255,.38));backdrop-filter:blur(22px) saturate(1.3);-webkit-backdrop-filter:blur(22px) saturate(1.3);box-shadow:0 0 0 1px rgba(255,255,255,.85),0 0 0 2px rgba(190,196,208,.35),inset 0 1px 1px #fff,inset 0 -8px 14px -8px rgba(255,255,255,.95),0 14px 22px -10px rgba(20,23,29,.18),0 18px 36px rgba(47,107,255,.14)}
+.haze{position:absolute;border-radius:50%;background:#DFE3EA;filter:blur(36px);opacity:.9;pointer-events:none}
+.orb{all:unset;cursor:pointer;width:40px;height:40px;border-radius:50%;background:linear-gradient(#fff,#F1F2F6);box-shadow:0 0 0 1px rgba(255,255,255,.9),inset 0 2px 3px #fff,inset 0 -5px 8px rgba(47,107,255,.12),0 10px 16px -6px rgba(20,23,29,.22);display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:17px;flex-shrink:0}
+.askin{all:unset;flex:1;min-width:0;font-size:15px;line-height:22px;color:var(--ink)}
+.askin::placeholder{color:var(--mut)}
+.right{position:absolute;left:1080px;top:48px;width:360px;height:762px;border-left:1px solid var(--hair);background:var(--surface);display:flex;flex-direction:column}
+.tabs{display:flex;gap:6px;padding:12px 16px 10px;border-bottom:1px solid var(--hair)}
+.tabs button{all:unset;cursor:pointer;height:32px;padding:0 14px;border-radius:10px;display:flex;align-items:center;gap:6px;font-size:15px;color:var(--mut)}
+.tabs button.on{background:var(--panel);color:var(--ink);font-weight:600}
+.tabs i{width:7px;height:7px;border-radius:50%;background:var(--acc)}
+.sess{display:flex;gap:8px;padding:12px 16px 0}
+.sess div{flex:1;height:40px;border-radius:12px;background:var(--sub);box-shadow:0 0 0 1px #E3E6EB;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-weight:500}
+.thread{flex:1;overflow:auto;padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.msg{border-radius:14px;box-shadow:0 0 0 1px #E3E6EB;padding:12px 14px;font-size:15px;line-height:22px;display:flex;flex-direction:column;gap:8px}
+.prog{font-size:14px;line-height:20px;color:var(--mut);padding:0 4px}
+.chg{border-radius:14px;box-shadow:0 0 0 1px #E3E6EB;padding:12px 14px}
+.chg .h{display:flex;justify-content:space-between;font-weight:600;padding-bottom:6px}
+.chg .h button{all:unset;cursor:pointer;font-weight:400;font-size:14px;color:var(--acc-x)}
+.chg .r{display:flex;justify-content:space-between;gap:10px;font-size:14px;line-height:20px;padding:6px 0;border-top:1px solid var(--hair)}
+.chg.undone{opacity:.5}
+.confirm{border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.pad{padding:0 16px 16px}
+.box{border-radius:18px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;min-height:112px}
+.det{flex:1;padding:18px 20px;display:flex;flex-direction:column;gap:20px;overflow:auto}
+.det .cap{margin-bottom:6px}
+.valin{display:flex;align-items:center;height:44px;border-radius:12px;box-shadow:0 0 0 1px var(--line);background:#fff;padding:0 6px 0 14px;font-size:17px;font-weight:600;gap:6px}
+.valin input{all:unset;width:70px;font-size:17px;font-weight:600;text-align:right;border-radius:6px}
+.valin input:focus{background:var(--acc-t)}
+.valin .st{display:flex;gap:2px;margin-left:auto}
+.valin .st button{all:unset;cursor:pointer;width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--panel);font-size:16px}
+.ev{font-size:14px;line-height:21px;color:var(--mut);border-radius:10px;background:var(--sub);padding:10px 12px}
+.resp{display:flex;gap:6px;flex-wrap:wrap}
+.resp button{all:unset;cursor:pointer;height:28px;padding:0 12px;border-radius:99px;font-size:14px;background:var(--panel);color:var(--mut);display:flex;align-items:center}
+.resp button.on{background:var(--acc-t);color:var(--acc-x);font-weight:600}
+.toolbar{position:absolute;height:40px;padding:0 14px;border-radius:14px;background:#fff;box-shadow:0 0 0 1px #E3E6EB,0 6px 16px rgba(20,23,29,.08);display:flex;align-items:center;gap:18px;font-size:14px;color:var(--mut)}
+.toast{position:absolute;right:24px;top:68px;z-index:20;background:var(--ink);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;line-height:20px;box-shadow:0 10px 24px rgba(20,23,29,.25);animation:tin .2s ease-out}
+@keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.queue{position:absolute;left:0;top:56px;width:320px;height:754px;border-right:1px solid var(--hair);padding:16px;display:flex;flex-direction:column;gap:10px;background:#fff;overflow:hidden}
+.qtabs{display:flex;gap:4px;padding:3px;border-radius:12px;background:var(--panel);margin:-4px 0 4px}
+.qtabs button{all:unset;cursor:pointer;flex:1;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:14px;color:var(--mut)}
+.qtabs button.on{background:#fff;color:var(--ink);font-weight:600;box-shadow:0 0 0 1px #E3E6EB}
+.qtabs .n{min-width:20px;height:20px;border-radius:10px;background:#E3E6EB;font-size:13px;display:inline-flex;align-items:center;justify-content:center}
+.qtabs .on .n{background:var(--acc);color:#fff}
+.fl{display:flex;gap:6px;flex-wrap:wrap;padding:4px 0 8px}
+.chatp{position:absolute;left:0;top:48px;width:280px;height:762px;border-right:1px solid var(--hair);display:flex;flex-direction:column;background:#fff}
+.chatp .hd{padding:14px 16px;border-bottom:1px solid var(--hair);font-weight:600;display:flex;align-items:center;gap:8px}
+.chatp .thread{flex:1;min-height:0}
+.sug{padding:12px 16px 16px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--hair)}
+.sug button{all:unset;cursor:pointer;box-sizing:border-box;border-radius:12px;padding:8px 12px;font-size:14px;line-height:20px;background:var(--sub);box-shadow:0 0 0 1px #E3E6EB}
+.sug button:hover{background:var(--panel)}
+.rcol{position:absolute;left:1100px;top:48px;width:340px;height:762px;border-left:1px solid var(--hair);display:flex;flex-direction:column;background:#fff}
+.rcol .hd{padding:14px 16px 10px;display:flex;justify-content:space-between;align-items:center}
+.rlist{flex:1;overflow:auto;padding:4px 16px 12px;display:flex;flex-direction:column;gap:10px}
+.rc{all:unset;box-sizing:border-box;width:100%;cursor:pointer;border-radius:16px;padding:14px 16px;box-shadow:0 0 0 1px #E3E6EB;display:flex;flex-direction:column;gap:8px;background:#fff}
+.rc:hover{background:var(--sub)}
+.rc.on{cursor:default;box-shadow:0 0 0 2px var(--acc),0 10px 24px rgba(47,107,255,.14)}
+.rc.done{opacity:.7}
+.rc b{font-size:16px;line-height:24px;font-weight:600}
+.rc .src{font-size:14px;line-height:20px;color:var(--mut)}
+.rc .chk{border-radius:10px;background:var(--sub);padding:10px 12px;font-size:14px;line-height:20px;display:flex;justify-content:space-between;gap:8px}
+.rfoot{padding:12px 16px 16px;border-top:1px solid var(--hair);display:flex;flex-direction:column;gap:8px}
+.slash.on{background:var(--acc-t);color:var(--acc-x);box-shadow:0 0 0 1px var(--acc)}
+.qi{all:unset;cursor:pointer;box-sizing:border-box;width:100%;border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;background:#fff;box-shadow:0 0 0 1px #E3E6EB}
+.qi b{font-size:15px;line-height:22px;font-weight:600}
+.qi span.s{font-size:14px;line-height:20px;color:var(--mut)}
+.qi.on{box-shadow:0 0 0 2px var(--acc),0 8px 20px rgba(47,107,255,.14)}
+.qi.done{opacity:.7}
+.qi:hover{background:var(--sub)}
+.prog-b{height:6px;border-radius:3px;background:#E3E6EB}
+.prog-b i{display:block;height:6px;border-radius:3px;background:var(--acc);transition:width .3s}
+.focus{position:absolute;left:320px;top:56px;width:1120px;height:754px;overflow:hidden;background-color:#FBFBFC;background-image:radial-gradient(#DDE0E6 1px,transparent 1.2px);background-size:24px 24px}
+.dock{position:absolute;left:0;right:0;bottom:20px;display:flex;flex-direction:column;align-items:center;gap:12px}
+.dec{width:720px;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 10px 10px 20px;border-radius:20px;background:#fff;box-shadow:0 0 0 1px #E3E6EB,0 12px 28px rgba(20,23,29,.10);transition:opacity .2s}
+.dec.fade{opacity:.5}
+.dec .b{display:flex;gap:8px;flex-shrink:0}
+.pbar{width:720px;position:relative}
+.pbar .glass{position:relative;height:60px;border-radius:30px;display:flex;align-items:center;gap:10px;padding:0 10px 0 20px;font-size:16px}
+.apanel{position:absolute;left:724px;top:24px;width:372px;border-radius:24px;padding:20px;display:flex;flex-direction:column;gap:14px;z-index:6}
+.apanel .t{font-size:16px;line-height:25px;font-weight:500}
+.evc{border-radius:12px;background:rgba(255,255,255,.7);box-shadow:0 0 0 1px #E3E6EB;padding:10px 12px;font-size:14px;line-height:20px;color:var(--mut)}
+.evc b{display:block;font-size:15px;color:var(--ink);font-weight:600}
+.phone{position:absolute;border-radius:28px;background:#fff;box-shadow:0 0 0 1px var(--line);padding:22px 20px;display:flex;flex-direction:column;font-size:14px;line-height:20px}
+.cta{margin-top:12px;height:46px;border-radius:6px;background:#B8BDC8;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;transition:background .3s}
+.cta.fixed{background:var(--acc)}
+.phone{background:#F3F3F4}
+.phone .cta.fixed{background:#0F2A5C}
+.pin{all:unset;cursor:pointer;position:absolute;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 0 0 1px var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600}
+.pin.on{box-shadow:0 0 0 2px var(--acc)}
+.pin.dn{color:var(--mut);background:var(--panel)}
+.pg{display:inline-block;width:13px;height:10px;border:1.5px solid currentColor;border-radius:2px;margin-right:8px;vertical-align:-1px;opacity:.7}
+.new{animation:pop .5s ease-out}
+@keyframes pop{from{box-shadow:0 0 0 3px var(--acc)}}
+.sw{position:absolute;width:96px;height:96px;border-radius:18px;box-shadow:0 0 0 1px #E3E6EB;padding:10px 12px;display:flex;align-items:flex-end;font-size:14px;cursor:pointer;border:0;text-align:left;font-family:inherit}
+.vgrid{position:absolute;display:grid;gap:8px}
+.vgrid i{display:block;width:72px;height:56px;border-radius:10px;background:#fff;box-shadow:0 0 0 1px #E3E6EB;transition:all .3s}
+.vgrid i.x{opacity:.15;transform:scale(.8)}
+.vgrid i.k{box-shadow:0 0 0 2px var(--acc)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ===== B·C 다크 (블러 & 백라이트) ===== */
+.app.dk{--surface:#15161A;--panel:#23252B;--sub:#1B1D22;--line:#3A3D45;--hair:#25272D;--ink:#ECEEF2;--mut:#979DAB;--acc:#3D78FF;--acc-t:rgba(61,120,255,.18);--acc-x:#A6BEFF;--ok:#63D6A0;--warn:#FF8F73;background:#0D0E11;color:var(--ink)}
+.app.dk .top,.app.dk .queue,.app.dk .chatp,.app.dk .rcol{background:#121316}
+.app.dk .canvas,.app.dk .focus{background-color:#0D0E11;background-image:radial-gradient(rgba(255,255,255,.07) 1px,transparent 1.2px)}
+.app.dk .seg{background:#1C1E23}
+.app.dk .seg button.on{background:#2D3038;color:#fff;box-shadow:none}
+.app.dk .seg .n{background:#2D3038;color:var(--mut)}
+.app.dk .seg .arr{color:#555A66}
+.app.dk .av{background:#2D3038;box-shadow:none}
+.app.dk .card{background:#1D1F24;box-shadow:0 0 0 1px #2C2F36;color:var(--mut)}
+.app.dk .card.sel{background:#24272D;box-shadow:0 0 0 1px #50555F}
+.app.dk .card.dim{filter:blur(2.5px);opacity:.55}
+.app.dk .card.dim:hover{filter:blur(1px);opacity:.85}
+.app.dk .phone{--ink:#14171D;--mut:#5F6672;--panel:#F1F3F6;--sub:#F6F7F9;--line:#D5D8DE;--surface:#fff;color:#14171D;background:#F3F3F4}
+.app.dk .tag{background:#2A2D34;color:var(--mut)}
+.app.dk .tag.g{background:rgba(99,214,160,.14);color:var(--ok)}
+.app.dk .chipx{background:var(--acc-t);color:var(--acc-x)}
+.app.dk .hl.flash{background:rgba(61,120,255,.5)}
+.app.dk .li:hover,.app.dk .sug button:hover,.app.dk .rc:hover,.app.dk .qi:hover{background:#1F2126}
+.app.dk .rc,.app.dk .qi{background:#1B1D22;box-shadow:0 0 0 1px #2C2F36}
+.app.dk .rc.on,.app.dk .qi.on{background:#24272D;box-shadow:0 0 0 1px #50555F}
+.app.dk .rc .chk,.app.dk .ev{background:#14161A}
+.app.dk .qtabs{background:#1C1E23}
+.app.dk .qtabs button.on{background:#2D3038;box-shadow:none;color:#fff}
+.app.dk .qtabs .n{background:#2D3038}
+.app.dk .prog-b{background:#2A2D34}
+.app.dk .sug button{background:#1B1D22;box-shadow:0 0 0 1px #2C2F36;color:var(--ink)}
+.app.dk .msg,.app.dk .chg{box-shadow:0 0 0 1px #2C2F36;background:#1B1D22}
+.app.dk .valin{background:#101114;box-shadow:0 0 0 1px #3A3D45}
+.app.dk .valin .st button{background:#2D3038}
+.app.dk #valin{background:#101114!important;color:var(--ink)}
+.app.dk .dec{background:#1B1D22;box-shadow:0 0 0 1px #2C2F36}
+.app.dk .evc{background:rgba(255,255,255,.06);box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.app.dk .pin{background:#2A2D34;color:var(--ink);box-shadow:0 0 0 1px #4A4F5A}
+.app.dk .pin.on{box-shadow:0 0 0 2px var(--acc)}
+.app.dk .toast{background:#2D3038;color:#fff}
+.app.dk .glass{background:linear-gradient(180deg,rgba(255,255,255,.13),rgba(255,255,255,.04));backdrop-filter:blur(22px) saturate(1.4);-webkit-backdrop-filter:blur(22px) saturate(1.4);box-shadow:0 0 0 1px rgba(255,255,255,.16),inset 0 1px 1px rgba(255,255,255,.3),inset 0 -12px 18px -12px rgba(120,150,255,.4),0 18px 36px -14px rgba(61,100,255,.4)}
+.app.dk .haze{background:rgba(61,100,255,.32);filter:blur(40px)}
+.app.dk .askin{color:var(--ink)}
+/* 일반 버튼: 플랫 */
+.app.dk .btn{box-shadow:none}
+.app.dk .btn.pri{background:#3D78FF;color:#fff}
+.app.dk .btn.pri:hover{background:#5A8DFF}
+.app.dk .btn.sec{background:#2A2D34;color:var(--ink);box-shadow:inset 0 0 0 1px #3C404A}
+.app.dk .btn.sec:hover{background:#333741}
+.app.dk .slash{background:#23252B;box-shadow:inset 0 0 0 1px #373A43;color:var(--ink)}
+.app.dk .slash.on{background:var(--acc-t);color:var(--acc-x);box-shadow:inset 0 0 0 1px var(--acc)}
+.app.dk .slash:hover{background:#2B2E36}
+/* 생성 버튼: 백라이트 (호버) */
+.app.dk .orb,.app.dk .slash[data-act="chip"],.app.dk .btn[data-act="apply"]{position:relative;background:linear-gradient(180deg,#121637,#0B0E26);color:#fff;font-weight:500;box-shadow:inset 0 0 0 1px rgba(130,150,255,.45),inset 0 -8px 12px -8px rgba(110,135,255,.35);transition:box-shadow .3s,background .3s}
+.app.dk .btn[data-act="apply"]{font-weight:600}
+.app.dk .orb::after,.app.dk .slash[data-act="chip"]::after,.app.dk .btn[data-act="apply"]::after{content:"";position:absolute;left:18%;right:18%;bottom:0;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,#C4D2FF,transparent);opacity:0;transition:opacity .3s}
+.app.dk .orb:hover,.app.dk .slash[data-act="chip"]:hover,.app.dk .btn[data-act="apply"]:hover,.app.dk .sug button:hover{background:linear-gradient(180deg,#171C48,#0D1130);box-shadow:inset 0 0 0 1px rgba(170,185,255,.85),inset 0 -10px 14px -8px rgba(120,150,255,.7),0 12px 26px -4px rgba(70,105,255,.85)}
+.app.dk .orb:hover::after,.app.dk .slash[data-act="chip"]:hover::after,.app.dk .btn[data-act="apply"]:hover::after{opacity:1}
+.app.dk .sug button:hover{color:#fff}
+.app.dk .sw{box-shadow:0 0 0 1px #3A3D45}
+.app.dk .sw[style*="2px"]{box-shadow:0 0 0 2px #2F6BFF,0 10px 24px rgba(47,107,255,.25)}
+/* 화면 점검: 화면 자체가 블러 → 결과 카드가 깨끗하게 등장 */
+.app.dk .phone.scr-think{overflow:hidden}
+.app.dk .phone.scr-think>*:not(.aiw){filter:blur(5px);opacity:.55;pointer-events:none}
+.app.dk .phone.scr-think::before{content:"";position:absolute;inset:-45%;pointer-events:none;z-index:1;background:radial-gradient(40% 48% at 28% 42%,rgba(120,150,255,.45),transparent 70%),radial-gradient(34% 44% at 72% 62%,rgba(190,170,255,.4),transparent 70%),radial-gradient(28% 38% at 52% 18%,rgba(255,200,230,.3),transparent 70%);filter:blur(16px);animation:aiflow 3s ease-in-out infinite alternate}
+.app.dk .phone .aiw{color:#14171D;text-shadow:0 0 12px rgba(255,255,255,.9)}
+.app.dk .card.gen{box-shadow:0 0 0 1px rgba(150,172,255,.85),0 0 0 5px rgba(61,110,255,.14),0 18px 44px -8px rgba(61,110,255,.7);background:#1A2038}
+.app.dk .phone.gen{box-shadow:0 0 0 1px rgba(150,172,255,.85),0 0 0 5px rgba(61,110,255,.14),0 18px 44px -8px rgba(61,110,255,.7)}
+.app.dk .phone.gen::after{content:"";position:absolute;left:12%;right:12%;bottom:-1px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,#C8D6FF,transparent)}
+.app.dk .emerge{animation:emerge .8s ease-out both}
+@keyframes emerge{from{opacity:0;filter:blur(8px);transform:translateY(8px)}to{opacity:1;filter:none;transform:none}}
+@media (prefers-reduced-motion:reduce){.app.dk .emerge,.app.dk .phone.scr-think::before{animation:none}}
+/* AI와 판단 중 / 판단 완료 */
+.app.dk .rc.ai-think,.app.dk .rc.ai-done{position:relative}
+.app.dk .ai-think{overflow:hidden;background:#20242F!important;box-shadow:0 0 0 1px rgba(180,198,255,.4)!important}
+.app.dk .ai-think>*:not(.aiw){filter:blur(3.5px);opacity:.5;pointer-events:none}
+.app.dk .ai-think::before{content:"";position:absolute;inset:-45%;pointer-events:none;background:radial-gradient(40% 48% at 28% 42%,rgba(215,228,255,.62),transparent 70%),radial-gradient(34% 44% at 72% 62%,rgba(150,176,255,.55),transparent 70%),radial-gradient(28% 38% at 52% 18%,rgba(255,236,250,.38),transparent 70%);filter:blur(16px);animation:aiflow 3s ease-in-out infinite alternate}
+@keyframes aiflow{0%{transform:translate(-9%,-5%) rotate(0) scale(1)}50%{transform:translate(6%,6%) rotate(14deg) scale(1.18)}100%{transform:translate(11%,-7%) rotate(-9deg) scale(1.06)}}
+.aiw{position:absolute;left:0;right:0;top:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:2;color:#fff;font-weight:600;font-size:15px;letter-spacing:.02em;text-shadow:0 1px 10px rgba(15,25,80,.75)}
+.aiw i{font-style:normal;animation:aid 1.2s infinite}
+.aiw i:nth-child(3){animation-delay:.2s}.aiw i:nth-child(4){animation-delay:.4s}
+@keyframes aid{0%,60%,100%{opacity:.2}30%{opacity:1}}
+.app.dk .card.ai-done,.app.dk .rc.ai-done,.app.dk .glass.ai-done{background:#1A2038;box-shadow:0 0 0 1px rgba(150,172,255,.85),0 0 0 5px rgba(61,110,255,.14),0 18px 44px -8px rgba(61,110,255,.7);animation:aiok .9s ease-out}
+.app.dk .ai-done::after{content:"";position:absolute;left:12%;right:12%;bottom:-1px;height:2px;border-radius:2px;background:linear-gradient(90deg,transparent,#C8D6FF,transparent)}
+.app.dk .ai-done>*{animation:unblur .8s ease-out}
+@keyframes unblur{from{filter:blur(3.5px);opacity:.5}to{filter:none;opacity:1}}
+@keyframes aiok{from{box-shadow:0 0 0 1px rgba(150,172,255,.3),0 0 0 0 rgba(61,110,255,0),0 0 0 0 rgba(61,110,255,0)}}
+@media (prefers-reduced-motion:reduce){.app.dk .ai-think::before,.aiw i,.app.dk .ai-done,.app.dk .ai-done>*{animation:none}}
+</style>
+
+<div class="ctl">
+  <h1>Luminous Audit 프로토타입</h1>
+  <div class="lay" id="lay" role="tablist" aria-label="구조 시안"></div>
+</div>
+<div class="tasks" id="tasks"></div>
+<div class="fit" id="fit"><div class="app" id="app"></div></div>
+
+<script>
+(function(){
+'use strict';
+var MODES=[['rules','배운다','룰'],['check','점검한다','화면 점검'],['system','쌓는다','디자인 시스템']];
+var LAYS=[['A','Copilot · 우측 패널형','입력·결과가 우측 패널','A'],['D','Dialogue · 대화형','대화 좌 · 캔버스 · 후보 카드 우','B'],['C','Triage · 검수 큐형','대기 큐 + 결정 바','C'],['E','Copilot mini · 우측 대화 분류형','좌 드롭다운 · 카드/답변 모두 우측','D']];
+var TASKS=[['edit','룰 값을 고쳐보기'],['confirm','룰 확정하기'],['ask','AI에게 질문하기'],['inspect','화면을 골라 AI로 점검하기'],['loop','점검에서 “룰 반영 필요” 누르기'],['variant','컴포넌트 변형 제안 받기']];
+var S;
+function seed(){
+  return {
+    layout:S?S.layout:'A', mode:'rules', leftTab:'queue', screen:'p1', flt:'all', tab:'agent', draft:'', busy:false, toast:'', fix:false,
+    sel:{rules:'r2',check:'d2',system:'s5'},
+    rules:[
+      {id:'r1',tpl:'화면당 정보 뎁스는 최대 {v}',val:2,unit:'',src:'인터뷰 #1',doc:0,cur:'2 (적합)',quote:'“예약 화면은 한 번에 읽혀야 해요. 정보 층이 세 겹을 넘으면 길을 잃어요.”',state:'ai'},
+      {id:'r2',tpl:'강조색 채움 면적은 {v}% 이내',val:20,unit:'%',src:'인터뷰 #2',doc:1,cur:'31%',quote:'“강조색이 화면의 20-30%를 넘으면 눌러야 할 곳이 흐려져요.”',state:'ai'},
+      {id:'r3',tpl:'같은 역할 컴포넌트는 변형 {v}개 이내',val:3,unit:'개',src:'인터뷰 #3',doc:2,cur:'9개',quote:'“센터 카드, 서비스 카드가 다 달라서 시스템이라고 부르기 어려워요.”',state:'edited'}
+    ],
+    diags:[
+      {id:'d1',scr:'p1',n:1,name:'지역 필터 칩',sub:'가로 스크롤 우려',q:'필터를 칩으로 둘지',note:'지역이 늘면 칩이 가로로 넘침. 칩 컴포넌트 대신 텍스트 필터가 적합.',key:'칩 4개 · 스크롤 우려',rule:'r1',rt:'UI 룰 · 선택지가 많으면 칩 대신 텍스트 필터를 쓴다',state:'pending'},
+      {id:'d2',scr:'p1',n:2,name:'길안내 · 아이콘 중복',sub:'동어 반복',q:'같은 역할이 두 번 나오는지',note:'길안내 버튼과 아이콘 버튼이 같은 역할을 함.',key:'동일 역할 2곳',rule:'r3',rt:'UX 룰 · 같은 정보와 역할은 연속해서 반복하지 않는다',state:'pending'},
+      {id:'d3',scr:'p1',n:3,name:'길안내 · 전화 위계',sub:'예약보다 강함',q:'보조 액션이 메인 태스크보다 강한지',note:'길안내·전화가 예약보다 중요하지 않음. 이 화면의 메인 태스크는 센터 선택.',key:'채움 버튼 4개',rule:'r2',rt:'UI 룰 · 보조 액션은 메인 태스크보다 위계를 낮춘다',state:'pending'},
+      {id:'d4',scr:'p1',n:4,name:'지점 미리보기',sub:'설명 부족',q:'고르기 전에 판단할 정보가 충분한지',note:'위치·거리 미리보기가 없어 지점 비교가 어려움.',key:'지도 · 거리 없음',rule:'r1',rt:'UX 룰 · 고객이 판단하기 전에 근거와 정보를 충분히 제공한다',state:'pending'},
+      {id:'d5',scr:'p2',n:1,name:'시간 선택 칩',sub:'선택 상태 약함',q:'선택한 시간이 구분되는지',note:'선택·비선택 칩 대비 1.4:1. 거의 구분 안 됨.',key:'칩 대비 1.4:1',rule:'r1',state:'pending'},
+      {id:'d6',scr:'p2',n:2,name:'서비스 항목 카드',sub:'변형 5개',q:'서비스 카드가 센터 카드와 같은 구조인지',note:'같은 역할 카드인데 변형이 5개.',key:'카드 변형 5개 · 룰 3개 이내',rule:'r3',state:'pending'},
+      {id:'d7',scr:'p3',n:1,name:'하단 버튼',sub:'강조 2곳',q:'하단 버튼이 하나로 읽히는지',note:'“예약하기”, “일정 변경” 둘 다 채움 버튼.',key:'채움 버튼 2개 · 룰 1개',rule:'r2',state:'pending'},
+      {id:'d8',scr:'p3',n:2,name:'취소 안내',sub:'경고색 사용',q:'취소 안내에 경고색을 써도 되는지',note:'단순 안내인데 빨강이라 오류처럼 보임.',key:'정보성 안내 · 경고색',rule:'r1',state:'pending'}
+    ],
+    sys:[
+      {id:'s5',kind:'컴포넌트 변형',title:'Date Picker · 기간 선택 변형',sub:'기획 요청 · 대차 이용 기간',key:'시작–종료일 선택 · 컴포넌트 룰 4개와 대조',scope:'대차 신청 화면 1개',src:'기획 요청 · 대차 신청',state:'req',reg:'변형으로 등록'},
+      {id:'s1',kind:'병합 제안',title:'카드 변형 9종 → 3종',sub:'화면 12개 영향',key:'9종 → 3종 (기본·선택됨·비활성)',scope:'화면 12개 · 컴포넌트 24개',src:'확정된 화면 3개에서 추출',state:'merge',reg:'시스템에 등록'},
+      {id:'s2',kind:'토큰',title:'color.primary',sub:'토큰 · 사용 24',key:'#0F2A5C · 사용 24',scope:'컴포넌트 24개 · 화면 12개',src:'확정된 화면 3개에서 추출',state:'ai',reg:'시스템에 등록'},
+      {id:'s3',kind:'오류',title:'하드코딩 색상 2건',sub:'센터 선택, 예약 확인',key:'#10295B → color.primary 교체',scope:'화면 2개',src:'센터 선택 · 예약 확인',state:'error',reg:'토큰으로 교체'},
+      {id:'s4',kind:'컴포넌트',title:'버튼 변형 4',sub:'컴포넌트',key:'Primary · Secondary · Ghost · Disabled',scope:'화면 12개',src:'확정된 화면 3개에서 추출',state:'ai',reg:'시스템에 등록'}
+    ],
+        vgen:false,dv:'',dd:false,gop:{},vres:{},vtheme:'light',vtab:{ex:'view',A:'view',B:'view'},memos:[],ai:{},checked:{},target:'screen',emerge:{},thread:[],answer:null,done:{},changes:{},newIds:{},seq:10
+  };
+}
+var $=function(s){return document.querySelector(s)};
+var app=$('#app');
+function esc(t){return String(t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function ruleOf(o){return o.rt?{tpl:o.rt,val:null,src:'기획의도 점검',cur:''}:ruleOf(o)}
+function rTitle(r){return r.val==null?r.tpl:r.tpl.replace('{v}',r.val)}
+var RT={ai:'AI 추출',edited:'사람이 수정함',confirmed:'확정',held:'보류'};
+var DT={pending:'응답 전',ok:'의도와 맞음',rule:'룰 반영 필요',talk:'논의 필요'};
+var ST={req:'변형 요청',ai:'AI 추출',merge:'병합 제안',error:'오류',registered:'등록됨',held:'보류'};
+var SCRN={p1:'센터 선택',p2:'일정 선택',p3:'예약 확인'};
+function visDiag(d){return S.layout==='A'?d.scr==='p1':(d.scr===S.screen&&!!S.checked[S.screen])}
+function scrT(){return S.layout!=='A'&&S.mode==='check'&&S.target==='screen'}
+function selId(){return scrT()?null:S.sel[S.mode]}
+function items(m){
+  if(m==='rules')return S.rules.map(function(r){return {id:r.id,title:rTitle(r),sub:r.src+(r.cur?' · 현재 '+r.cur:''),tag:RT[r.state],pend:r.state==='ai'||r.state==='edited'}});
+  if(m==='check')return S.diags.filter(visDiag).map(function(d){return {id:d.id,title:d.n+' '+d.name,sub:d.sub,tag:DT[d.state],pend:d.state==='pending'}});
+  return S.sys.map(function(s){return {id:s.id,title:s.title,sub:s.sub,tag:ST[s.state],pend:s.state==='req'||s.state==='ai'||s.state==='merge'||s.state==='error'}});
+}
+function cnt(m){if(m==='check')return S.diags.filter(function(d){return d.state==='pending'&&(S.layout==='A'?d.scr==='p1':!!S.checked[d.scr])}).length;return items(m).filter(function(i){return i.pend}).length}
+function byId(m,id){var a=m==='rules'?S.rules:m==='check'?S.diags:S.sys;for(var i=0;i<a.length;i++)if(a[i].id===id)return a[i]}
+function cur(){if(scrT())return null;return byId(S.mode,S.sel[S.mode])}
+function toast(t){S.toast=t;render();clearTimeout(toast.t);toast.t=setTimeout(function(){S.toast='';render()},2200)}
+function done(k){S.done[k]=true}
+
+/* ---------- AI replies ---------- */
+function reply(m,text){
+  var o=cur(),t=text;
+  if(m==='rules'){
+    if(/예외/.test(t))return {prog:'인터뷰 3건 확인 중',text:'인터뷰 #3에 “홈 화면은 차량 이미지가 있어 예외로 본다”는 언급 1건. 예약 화면은 해당 없음.',ev:[['인터뷰 #3 · 4번째 문장','“홈 화면은 차량 이미지가 있어 예외로 본다”']],act:{label:'예외 후보를 큐에 추가',key:'addExc'}};
+    if(/영향|화면은/.test(t))return {prog:'적용 범위 계산 중',text:'예약 플로우 3개 화면에 적용. 현재 1개가 기준 초과.',ev:[['센터 선택','현재 '+(o.cur||'-')]]};
+    if(/근거|문장/.test(t))return {prog:'근거 문장 검색 중',text:'가장 가까운 근거 · '+o.src+' · '+o.quote,ev:[[o.src,o.quote]]};
+    if(/추출|룰$/.test(t))return {prog:'인터뷰 #2 재확인 중',text:'룰 후보 1건 추가: “버튼 라벨은 동사로 끝낸다”',ev:[['인터뷰 #2 · 7번째 문장','“버튼은 눌렀을 때 일어나는 일을 말해야죠.”']],act:{label:'룰 후보 추가',key:'addRule'}};
+    if(/충돌/.test(t))return {prog:'룰 간 충돌 확인 중',text:'충돌 없음. 세 룰이 각각 뎁스·색 면적·변형 수를 다룸.',ev:[]};
+    return {prog:'룰 확인 중',text:'“'+rTitle(o)+'” 기준. 예외·영향 범위·근거 문장을 물어볼 수 있음.',ev:[]};
+  }
+  if(m==='check'){
+    if(/기획/.test(t))return {prog:'기획의도 대조 중',text:'기획의도 위반 4건 (UI 룰 2 · UX 룰 2). 수정안을 만들 수 있음.',ev:[['UI 룰','필터 칩 · 보조 액션 위계'],['UX 룰','동어 반복 · 판단 근거']],act:{label:'수정안 보기',key:'fix'}};
+    if(/색|바꾸/.test(t))return {prog:'수정안 시뮬레이션 중',text:'길안내·전화를 테두리 버튼으로 바꾸면 강조색 면적 31% → 18%. 예약 플로우 3개 화면에 영향.',ev:[['룰 · 강조색 채움 면적은 20% 이내','인터뷰 #2 · 현재 31%'],['영향','진단 2 해결 · 예약 플로우 화면 3개']],act:{label:'수정안 보기',key:'fix'}};
+    if(/근거|룰/.test(t))return {prog:'근거 룰 검색 중',text:'근거 룰: “강조색 채움 면적은 20% 이내”(인터뷰 #2). 현재 31%.',ev:[['인터뷰 #2','“강조색이 화면의 20-30%를 넘으면…”']]};
+    if(/점검/.test(t))return {prog:'화면 재점검 중',text:'추가 항목 1건. 주소 문구 대비 3.1:1.',ev:[['접근성','대비 3.1:1 · 기준 4.5:1']],act:{label:'진단 추가',key:'addDiag'}};
+    return {prog:'진단 확인 중',text:'예약 플로우 3개 화면에 걸린 진단. 색을 바꾸면 어떻게 되는지 물어볼 수 있음.',ev:[]};
+  }
+  if(/변형|기간|캘린더|제안/.test(t))return {prog:'컴포넌트 룰 4개와 대조 중',text:'룰 안에서 만든 변형 1안(적합 4/4)과, 룰을 벗어나는 새 컴포넌트 1안(적합 1/4)을 만들었음.',ev:[['룰 안에서','Range · 밴드형 · 4/4 적합'],['룰 위배','연속형 · 채움 면적 34%']]};
+  if(/병합|카드/.test(t))return {prog:'카드 9종 비교 중',text:'9종 모두 구조는 같고 간격만 다름. 기본·선택됨·비활성 3종으로 합치면 화면 12개가 한 번에 정리됨.',ev:[['확정된 화면 3개에서 추출','카드 변형 9종 · 구조 동일']],act:{label:'병합 등록',key:'regMerge'}};
+  if(/다크/.test(t)&&cur().id==='s5')return {prog:'다크 토큰 확인 중',text:'다크 짝을 컴포넌트에 적용했어요. 토큰 5개 모두 다크 값이 있어요.',ev:[['color.accent','#3D78FF → #6C9BFF']]};
+  if(/다크/.test(t))return {prog:'다크 짝 계산 중',text:'토큰 18개 중 16개는 다크 짝 자동 생성. 2개는 대비 확인 필요.',ev:[['토큰 18개','자동 16 · 확인 2']]};
+  if(/추출/.test(t))return {prog:'확정 화면 재확인 중',text:'토큰 1개 추가: radius.card (12px)',ev:[['센터 선택','사용 31곳']],act:{label:'토큰 추가',key:'addTok'}};
+  if(/컴포넌트|새/.test(t))return {prog:'기존 컴포넌트 비교 중',text:'새 카드 불필요. 기존 “센터 카드” 재사용 가능.',ev:[]};
+  return {prog:'항목 확인 중',text:'“'+(cur().title||'')+'” 기준. 병합·다크 짝·새 컴포넌트 여부를 물어볼 수 있음.',ev:[]};
+}
+function startJudge(id,ms,fn){var s=S;s.ai[id]='think';setTimeout(function(){if(S!==s)return;if(s.ai[id]==='think'){s.ai[id]='done';if(fn)fn();render()}},ms)}
+function screenReply(sc,t){if(/기획/.test(t||'')&&sc==='p1')return {prog:'기획의도 대조 중',text:'기획의도 위반 4건 (UI 룰 2 · UX 룰 2). 수정안을 만들 수 있음.',ev:[['UI 룰','필터 칩 · 보조 액션 위계'],['UX 룰','동어 반복 · 판단 근거']],act:{label:'수정안 보기',key:'fix'}};
+  var n=S.diags.filter(function(d){return d.scr===sc}).length;return {prog:'화면 점검 중',text:SCRN[sc]+' 점검 완료. 진단 '+n+'건. 각각 의도에 맞는지 응답해 주세요.',ev:[]}}
+function applyAI(){
+  if(S.layout==='A')return;
+  if(S.mode==='check'&&S.target==='screen'){
+    if(S.ai['scr:'+S.screen]==='think'){var ph=app.querySelector('.phone');if(ph){ph.classList.add('scr-think');ph.insertAdjacentHTML('beforeend','<span class="aiw">화면 읽는 중<i>.</i><i>.</i><i>.</i></span>')}}
+    return;
+  }
+  var o=cur();if(!o)return;var st=S.ai[o.id];if(!st)return;
+  var it=items(S.mode).filter(function(x){return x.id===o.id})[0];if(!it||!it.pend)return;
+  var els=app.querySelectorAll('.card.sel,.rc.on,.aiobj');
+  Array.prototype.forEach.call(els,function(el){
+    if(st==='think'){el.classList.add('ai-think');el.insertAdjacentHTML('beforeend','<span class="aiw">AI 판단 중<i>.</i><i>.</i><i>.</i></span>')}
+    else el.classList.add('ai-done');
+  });
+}
+function ask(text){
+  text=(text||'').trim();if(!text||S.busy)return;
+  var m=S.mode,ctx=chipLabel();
+  var scr=scrT(),sc=S.screen;
+  S.draft='';S.busy=true;done('ask');
+  if(S.layout!=='A'){
+    if(scr)startJudge('scr:'+sc,2200,function(){S.checked[sc]=true;done('inspect');S.diags.forEach(function(d){if(d.scr===sc)S.emerge[d.id]=1})});
+    else if(ctxObj()){var cid=ctxObj().id;startJudge(cid,2200,function(){if(m==='system'&&cid==='s5'&&/변형|제안|기간|캘린더/.test(text)){S.vgen=true;S.emerge.va=1;S.emerge.vb=1;done('variant')}})}
+  }
+  if(S.layout==='C'){S.answer={pending:true,q:text,prog:'분석 중…'}}
+  else{S.thread.push({t:'user',text:text,chip:ctx,m:m});S.thread.push({t:'prog',text:'분석 중…',m:m});S.tab='agent'}
+  render();
+  setTimeout(function(){
+    var r=scr?screenReply(sc,text):reply(m,text);S.busy=false;
+    if(m==='system'&&S.sel.system==='s5'&&S.vgen&&/다크/.test(text))S.vtheme='dark';
+    if(S.layout==='C'){S.answer={q:text,text:r.text,ev:r.ev,act:r.act,prog:r.prog}}
+    else{S.thread.pop();S.thread.push({t:'prog',text:r.prog+' · 완료',m:m});S.thread.push({t:'ans',text:r.text,ev:r.ev,act:r.act,used:false,mode:m})}
+    if(S.layout==='A'&&m==='system'&&S.sel.system==='s5'&&/변형|제안|기간|캘린더/.test(text)){S.vgen=true;done('variant')}
+    render();
+    var th=document.querySelector('.thread');if(th)th.scrollTop=th.scrollHeight;var ec=document.querySelector('.econv');if(ec)ec.scrollTop=ec.scrollHeight;
+  },scr?2200:650);
+}
+function ctxObj(){var o=cur();return o}
+function chipLabel(){var o=cur();if(!o)return S.mode==='check'?'@'+SCRN[S.screen]:'';return '@'+(S.mode==='rules'?rTitle(o).replace(/ 이내| 최대 \d+/,''):S.mode==='check'?o.n+' '+o.name:o.title)}
+function clb(s){return s==='/변형 제안'?'컴포넌트 변형 테스트':s}
+function suggestions(m){return m==='rules'?['이 룰 예외 있어?','적용되는 화면은?','/룰 추출']:m==='check'?(scrT()?['/점검','기획의도 점검','접근성만 점검']:['기획의도 점검','근거 룰 보기','/점검']):['/변형 제안','병합 시 영향','다크 짝 보기']}
+
+/* ---------- state changes ---------- */
+function logChange(title,rows,undo){
+  if(S.layout==='C'){return}
+  var id='c'+(++S.seq);S.changes[id]=undo;
+  S.thread.push({t:'chg',m:S.mode,id:id,title:title,rows:rows,undone:false});S.tab='agent';
+}
+function applyAct(key,aid){
+  if(key==='addExc'){var r={id:'r'+(++S.seq),tpl:'마이현대 홈 화면은 강조색 면적 예외',val:null,unit:'',src:'인터뷰 #3',doc:2,cur:'',quote:'“홈 화면은 차량 이미지가 있어 예외로 본다.”',state:'ai'};S.rules.unshift(r);S.newIds[r.id]=1;S.sel.rules=r.id;S.mode='rules';logChange('변경 사항',[['룰 후보 추가',r.tpl]],function(){S.rules=S.rules.filter(function(x){return x.id!==r.id})})}
+  if(key==='addRule'){var r2={id:'r'+(++S.seq),tpl:'버튼 라벨은 동사로 끝낸다',val:null,unit:'',src:'인터뷰 #2',doc:1,cur:'',quote:'“버튼은 눌렀을 때 일어나는 일을 말해야죠.”',state:'ai'};S.rules.push(r2);S.newIds[r2.id]=1;S.sel.rules=r2.id;logChange('변경 사항',[['룰 후보 추가',r2.tpl]],function(){S.rules=S.rules.filter(function(x){return x.id!==r2.id})})}
+  if(key==='fix'){S.fix=true;S.checked.p1=true;S.emerge.gen=1;S.dv='';logChange('변경 사항',[['새 화면 생성','센터 선택 · 수정안']],function(){S.fix=false;S.dv=''})}
+  if(key==='addDiag'){var d={id:'d'+(++S.seq),scr:(S.layout==='A'?'p1':S.screen),n:S.diags.filter(visDiag).length+1,name:'주소 문구',sub:'대비 3.1:1',q:'주소 문구 대비를 올릴지',note:'대비 3.1:1. 기준 4.5:1 미달.',key:'대비 3.1:1 · 기준 4.5:1',rule:'r1',state:'pending'};S.diags.push(d);S.newIds[d.id]=1;S.sel.check=d.id;logChange('변경 사항',[['진단 추가',d.n+' '+d.name]],function(){S.diags=S.diags.filter(function(x){return x.id!==d.id})})}
+  if(key==='regMerge'){var s=byId('system','s1');var p=s.state;s.state='registered';done('merge');logChange('변경 사항',[['병합 등록','카드 9종 → 3종']],function(){s.state=p})}
+  if(key==='addTok'){var t={id:'s'+(++S.seq),kind:'토큰',title:'radius.card',sub:'토큰 · 사용 31',key:'12px · 사용 31',scope:'컴포넌트 18개',src:'센터 선택에서 추출',state:'ai',reg:'시스템에 등록'};S.sys.push(t);S.newIds[t.id]=1;S.sel.system=t.id;logChange('변경 사항',[['토큰 추가','color.border']],function(){S.sys=S.sys.filter(function(x){return x.id!==t.id})})}
+  if(S.layout==='C'&&S.answer){S.answer=null;}
+  if(aid!=null&&S.thread[aid])S.thread[aid].used=true;
+  render();
+}
+function setState(m,id,ns,label){
+  var o=byId(m,id),prev=o.state;o.state=ns;
+  var ttl=m==='rules'?rTitle(o):m==='check'?o.n+' '+o.name:o.title;
+  logChange('변경 사항',[[label,ttl]],function(){o.state=prev});
+  return ttl;
+}
+function nextPending(){
+  var it=items(S.mode),i=0,k;
+  for(k=0;k<it.length;k++)if(it[k].id===S.sel[S.mode])i=k;
+  for(k=1;k<=it.length;k++){var c=it[(i+k)%it.length];if(c.pend){S.sel[S.mode]=c.id;S.target='obj';return}}
+}
+function afterDecide(){if(S.layout==='C'||S.layout==='D'||S.layout==='E')nextPending()}
+function decide(kind){
+  var m=S.mode,o=cur();if(!o)return;
+  if(m==='rules'){
+    if(kind==='ok'){setState('rules',o.id,'confirmed','룰 확정');done('confirm');afterDecide();toast('룰 확정됨')}
+    else if(kind==='hold'){setState('rules',o.id,'held','룰 보류');afterDecide()}
+    else if(kind==='edit'){var el=document.getElementById('valin');if(el){el.focus();el.select()}else toast('값 칸을 눌러 수정');return}
+  }
+  if(m==='check'){
+    if(kind==='ok'){setState('check',o.id,'ok','응답 · 의도와 맞음');toast('이 화면은 예외로 처리');afterDecide()}
+    else if(kind==='rule'){
+      setState('check',o.id,'rule','응답 · 룰 반영 필요');
+      var r={id:'r'+(++S.seq),tpl:'예약 화면의 CTA는 하나만 강조한다',val:null,unit:'',src:'화면 점검 · 진단 '+o.n,doc:1,cur:'',quote:'“진단 '+o.n+'에서 올라온 룰 후보”',state:'ai'};
+      S.rules.push(r);S.newIds[r.id]=1;done('loop');toast('룰 후보 1건 → “배운다”에 추가');afterDecide()
+    }
+    else if(kind==='talk'){setState('check',o.id,'talk','응답 · 논의 필요');if(S.memos.indexOf(o.id)<0)S.memos.push(o.id);afterDecide()}
+  }
+  if(m==='system'){
+    if(kind==='ok'){setState('system',o.id,'registered',o.reg||'등록');if(o.id==='s1')done('merge');afterDecide();toast('시스템에 반영됨')}
+    else if(kind==='hold'){setState('system',o.id,'held','보류');afterDecide()}
+  }
+  render();
+}
+
+/* ---------- left list / board ---------- */
+function leftList(){
+  var m=S.mode,it=items(m),h='';
+  var head=m==='rules'?['자료',['인터뷰 #1','PO'],['인터뷰 #2','UI 디자이너'],['인터뷰 #3','시스템 운영'],'룰 · '+it.length]:m==='check'?['화면',['센터 선택','원본'],['변형 A',''],['변형 B',''],'진단 · '+it.length]:['확정된 화면',['센터 선택',''],['일정 선택',''],['예약 확인',''],'토큰·컴포넌트 · '+it.length];
+  h+='<div class="sec-h">'+head[0]+'</div>';
+  for(var i=1;i<=3;i++)h+='<div class="ro"><span>'+head[i][0]+'</span><span>'+head[i][1]+'</span></div>';
+  h+='<div class="sec-h">'+head[4]+'</div>';
+  it.forEach(function(x){var on=x.id===S.sel[m];h+='<button class="li'+(on?' on':'')+(x.pend?'':' done')+'" data-act="sel" data-id="'+x.id+'"><span>'+(on?'<i class="dot"></i>':'')+esc(x.title)+'</span><small>'+x.tag+'</small></button>'});
+  return '<div class="left">'+h+'</div>';
+}
+var DOCS=['인터뷰 #1','인터뷰 #2','인터뷰 #3'];
+var DSUB=['PO · 예약 플로우','UI 디자이너 · 위계','디자인 시스템 운영'];
+function boardRules(){
+  var h='<div class="cap abs" style="left:36px;top:36px">자료</div><div class="cap abs" style="left:400px;top:36px">추출된 룰</div>';
+  var sel=byId('rules',S.sel.rules),lines='';
+  var y0=72,gap=124,docY=[72,200,328];
+  S.rules.forEach(function(r,i){
+    var y=y0+i*gap,on=r.id===sel.id,dy=docY[r.doc]+40;
+    lines+='<line x1="266" y1="'+dy+'" x2="400" y2="'+(y+44)+'" stroke="'+(on?'#2F6BFF':'#D5D8DE')+'" stroke-width="'+(on?1.6:1)+'"/>';
+    h+='<button class="card'+(on?' sel':' dim')+(S.newIds[r.id]?' new':'')+'" data-act="sel" data-id="'+r.id+'" style="left:400px;top:'+y+'px;width:390px;height:'+(on?112:88)+'px"><b>'+esc(rTitle(r))+'</b><span>'+r.src+' · '+RT[r.state]+(r.cur?' · 현재 '+r.cur:'')+'</span>'+(on&&r.cur?'<span>'+(parseFloat(r.cur)>r.val&&r.val!=null?'기준 초과':'기준 이내')+'</span>':'')+'</button>';
+  });
+  DOCS.forEach(function(d,i){
+    var act=sel.doc===i;
+    h+='<div class="card noclick'+(act?'':' dim')+'" style="left:36px;top:'+docY[i]+'px;width:230px;height:'+(act?100:80)+'px"><b>'+d+'</b><span>'+DSUB[i]+'</span>'+(act?'<span class="hl" id="hlq">'+esc(sel.quote)+'</span>':'')+'</div>';
+  });
+  return '<svg class="abs" width="840" height="762" style="left:0;top:0;pointer-events:none">'+lines+'</svg>'+h;
+}
+function phoneHtml(x,y,w,hh,scale,fx){if(fx===undefined)fx=S.fix;
+  var st='left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+hh+'px',N='#0F2A5C',ttl=function(t){return '<b style="text-align:center;font-size:15px">'+t+'</b>'},
+  wc='background:#fff;border-radius:12px;padding:10px 12px;',
+  chip=function(t,on){return '<span style="display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:15px;font-size:14px;'+(on?'background:'+N+';color:#fff':'background:#E7E9EE;color:#4B5563')+'">'+t+'</span>'},
+  row=function(a,b){return '<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="color:#5F6672">'+a+'</span><b style="font-weight:600">'+b+'</b></div>'};
+  if(S.screen==='p2'){
+    var d='';[['24',0],['25',0],['26',0],['27',1],['28',0]].forEach(function(c){d+='<span style="flex:1;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;'+(c[1]?'background:'+N+';color:#fff':'background:#F1F3F6')+'">'+c[0]+'</span>'});
+    return '<div class="phone" style="'+st+'">'+ttl('일정 선택')+'<div style="'+wc+'margin-top:12px"><b>10월</b><div style="display:flex;gap:4px;margin-top:8px">'+d+'</div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">'+chip('10:00')+chip('11:00',1)+chip('13:00')+chip('14:00')+'</div></div><div style="'+wc+'margin-top:8px"><b>서비스</b>'+row('엔진 오일 점검','✓')+row('브레이크 점검','')+'</div><div style="flex:1"></div><div class="cta fixed">다음</div></div>';
+  }
+  if(S.screen==='p3')return '<div class="phone" style="'+st+'">'+ttl('예약 확인')+'<div style="'+wc+'margin-top:12px">'+row('센터','양재')+row('일시','10.28 11:00')+row('차량','12가1234')+row('서비스','엔진 오일')+'</div><div style="margin-top:8px;border-radius:12px;background:#FDECEC;color:#D93A3A;padding:10px 12px;font-size:14px;line-height:20px">예약 취소는 방문 하루 전까지 무료예요</div><div style="flex:1"></div><div class="cta fixed">예약하기</div><div class="cta fixed" style="margin-top:8px">일정 변경</div></div>';
+  if(fx&&S.screen==='p1'){var tg=function(t){return '<span style="background:#EAEFF7;color:#4B5563;border-radius:4px;padding:2px 6px;font-size:14px">'+t+'</span>'};return '<div class="phone" style="'+st+'">'+ttl('정비 예약')+'<div style="display:flex;gap:3px;margin-top:8px"><i style="flex:1;height:3px;background:'+N+'"></i><i style="flex:1;height:3px;background:#DADCE1"></i><i style="flex:1;height:3px;background:#DADCE1"></i></div><b style="font-size:16px;line-height:22px;margin-top:10px">정비 센터를<br>선택해 주세요</b><div style="display:flex;justify-content:space-between;color:#5F6672;margin-top:6px"><span>총 15곳</span><span>서울 ⌄</span></div><div style="'+wc+'margin-top:6px;box-shadow:0 0 0 1px '+N+'"><div style="display:flex;justify-content:space-between"><b>방배동부점</b><span style="color:#2F5D9A">3.1km</span></div><div style="display:flex;gap:4px;margin-top:4px">'+tg('종합')+tg('전기차')+'</div><div style="height:56px;margin-top:6px;border-radius:2px;background:linear-gradient(120deg,#DDEBD3 0 30%,#F1F4F8 30% 60%,#FFE3A6 60% 66%,#F1F4F8 66%)"></div><div style="display:flex;margin-top:6px;text-align:center"><span style="flex:1">전화</span><i style="width:1px;background:#D5D8DE"></i><span style="flex:1">길찾기</span></div></div><div style="'+wc+'margin-top:6px"><div style="display:flex;justify-content:space-between"><b>남양 하이테크</b><span style="color:#2F5D9A">100km</span></div></div><div style="flex:1"></div><div class="cta fixed">이 센터로 예약하기</div></div>';}
+  return '<div class="phone" style="'+st+'">'+ttl('정비 예약 · 센터 선택')+'<div style="display:flex;gap:6px;margin-top:12px">'+chip('서울',1)+chip('경기')+chip('인천')+'</div><div style="'+wc+'margin-top:10px"><b>양재 하이테크센터</b><div style="color:#5F6672;margin-top:2px">서초구 헌릉로 12</div><div style="display:flex;gap:6px;margin-top:8px"><span style="flex:1;height:36px;border-radius:8px;background:'+N+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px">길안내</span><span style="flex:1;height:36px;border-radius:8px;background:'+N+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px">전화</span></div></div><div style="'+wc+'margin-top:8px"><b>남양 하이테크센터</b><div style="color:#5F6672;margin-top:2px">화성시 남양읍</div></div><div style="flex:1"></div><div class="cta'+(S.fix?' fixed':'')+'">이 센터로 예약하기</div></div>';
+}
+var MB='background:#fff;border-radius:10px;padding:8px 10px;color:#14171D;font-size:12.5px;line-height:18px;',NV='#0F2A5C';
+var DV={
+ d1:[['텍스트 필터','칩 대신 “서울 ⌄”로 지역을 바꿔요','<div style="'+MB+'display:flex;justify-content:space-between"><span style="color:#5F6672">총 15곳</span><b style="font-weight:600">서울 ⌄</b></div>'],
+     ['필터 시트','지역이 늘어도 한 줄을 유지해요','<div style="'+MB+'"><span style="display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:12px;background:#E7E9EE">필터 · 서울</span><div style="width:40px;height:4px;border-radius:2px;background:#D5D8DE;margin:8px auto 0"></div></div>']],
+ d2:[['길안내 버튼 1개','아이콘을 빼고 라벨 하나로 통일해요','<div style="'+MB+'"><span style="display:flex;height:30px;border-radius:8px;background:'+NV+';color:#fff;align-items:center;justify-content:center">길안내</span></div>'],
+     ['아이콘 버튼 1개','라벨 없이 아이콘만 남겨요','<div style="'+MB+'display:flex;gap:8px;align-items:center"><span style="display:inline-flex;width:30px;height:30px;border-radius:50%;background:'+NV+';color:#fff;align-items:center;justify-content:center">↗</span><span style="color:#5F6672">방배동부점</span></div>']],
+ d3:[['테두리 버튼','메인 버튼보다 한 단계 낮춰요','<div style="'+MB+'display:flex;gap:6px"><span style="flex:1;height:30px;border-radius:8px;box-shadow:inset 0 0 0 1px '+NV+';color:'+NV+';display:flex;align-items:center;justify-content:center">길안내</span><span style="flex:1;height:30px;border-radius:8px;box-shadow:inset 0 0 0 1px '+NV+';color:'+NV+';display:flex;align-items:center;justify-content:center">전화</span></div>'],
+     ['텍스트 링크','눈에 띄는 면적을 더 줄여요','<div style="'+MB+'color:'+NV+';text-decoration:underline">길안내 · 전화</div>']],
+ d4:[['거리 + 지도 썸네일','고르기 전에 위치를 바로 봐요','<div style="'+MB+'display:flex;gap:8px;align-items:center"><span style="width:44px;height:44px;border-radius:8px;background:#DDE5EF;display:inline-flex;align-items:center;justify-content:center;color:'+NV+'">●</span><span><b style="font-weight:600">방배동부점</b><br><span style="color:#2F5D9A">3.1km</span></span></div>'],
+     ['거리 텍스트','지도 없이 거리만 보여줘요','<div style="'+MB+'"><b style="font-weight:600">방배동부점</b> · <span style="color:#2F5D9A">3.1km</span></div>']]
+};
+function dvCards(id,x,y,w,hz,gap,vert){
+  var L=DV[id];if(!L)return '';var d=byId('check',id);
+  return L.map(function(v,i){var l=vert?x:x+i*(w+gap),t=vert?y+i*(hz+gap):y;return '<div class="card noclick'+(S.emerge.dv?' emerge':'')+'" style="left:'+l+'px;top:'+t+'px;width:'+w+'px;height:'+hz+'px;padding:12px;gap:8px"><span style="display:flex;justify-content:space-between;align-items:center"><span>진단 '+d.n+' · 변형 '+(i+1)+'</span>'+(i===0?'<span class="tag g">수정안에 적용</span>':'')+'</span>'+v[2]+'<b style="font-size:14px;line-height:20px">'+v[0]+'</b><span style="font-size:13px;line-height:18px">'+v[1]+'</span></div>'}).join('');
+}
+function boardCheck(){
+  var sel=cur(),chk=S.layout==='A'||!!S.checked[S.screen],h='<div class="cap abs" style="left:36px;top:36px">원본 · '+SCRN[S.screen]+'</div>',gen=S.fix&&S.screen==='p1';
+  h+=phoneHtml(36,66,244,528,0,false);
+  if(gen)h+='<div class="cap abs" style="left:330px;top:36px">새로 생성 · 수정안</div>'+phoneHtml(330,66,244,528,0,true).replace('class="phone"','class="phone gen'+(S.emerge.gen?' emerge':'')+'"');
+  var pys=[86,236,356,520],L=S.diags.filter(visDiag).slice(0,4);
+  L.forEach(function(d,i){h+='<button class="pin'+(sel&&d.id===sel.id?' on':'')+(d.state!=='pending'?' dn':'')+(S.emerge[d.id]?' emerge':'')+'" data-act="sel" data-id="'+d.id+'" style="left:268px;top:'+pys[i]+'px" aria-label="진단 '+d.n+'">'+d.n+'</button>'});
+  var bubble;
+  if(sel)bubble=sel.state==='pending'?'<div style="font-size:14px;color:var(--mut)">진단 '+sel.n+' · '+esc(sel.name)+'</div><div style="font-size:16px;line-height:24px;font-weight:600;margin-top:4px">'+esc(sel.q)+'</div>':'<div style="font-size:14px;color:var(--mut)">진단 '+sel.n+' · '+esc(sel.name)+'</div><div style="font-size:16px;line-height:24px;font-weight:600;margin-top:4px">'+DT[sel.state]+'</div>';
+  else bubble='<div style="font-size:14px;color:var(--mut)">'+SCRN[S.screen]+'</div><div style="font-size:16px;line-height:24px;font-weight:600;margin-top:4px">'+(chk?'진단 '+L.length+'건 · 핀이나 카드를 눌러 확인':'아직 점검 전 · 아래 /점검을 누르세요')+'</div>';
+  if(gen&&sel&&sel.scr==='p1')bubble+='<button class="btn sec" style="height:34px;margin-top:10px;font-size:14px;width:100%" data-act="dvar" data-id="'+sel.id+'">'+(S.dv===sel.id?'배리에이션 접기':'이 진단 배리에이션 보기')+'</button>';
+  h+='<div class="glass abs'+(sel?' aiobj':'')+'" style="left:'+(gen?'600':'310')+'px;top:'+(gen?'450':'430')+'px;width:'+(gen?'220':'300')+'px;border-radius:18px;padding:14px 16px">'+bubble+'</div>';
+  if(gen&&sel&&S.dv===sel.id)h+=dvCards(sel.id,590,112,230,160,10,true);
+  if(!(gen&&sel&&S.dv===sel.id))S.memos.forEach(function(id,i){var d=byId('check',id);h+='<div class="card noclick" style="left:'+(gen?'610':'560')+'px;top:32px;width:210px;background:var(--sub);'+(i?'display:none':'')+'"><span>● 사람 논의 필요 '+S.memos.length+'건</span><span style="color:var(--ink)">'+esc(d.q)+'</span></div>'});
+  if(!S.memos.length&&!(gen&&sel&&S.dv===sel.id))h+='<div class="card noclick" style="left:'+(gen?'610':'560')+'px;top:32px;width:210px;background:var(--sub)"><span>● 논의 메모</span><span>“논의 필요” 응답이 여기에 모여요</span></div>';
+  return h;
+}
+function mdCard(l,t,w,h){
+  var toks=S.sys.filter(function(x){return x.state==='registered'&&x.kind==='토큰'}),comps=S.sys.filter(function(x){return x.state==='registered'&&(x.kind==='컴포넌트'||x.kind==='병합 제안'||x.kind==='컴포넌트 변형')}),dos=S.rules.filter(function(r){return r.state==='confirmed'});
+  function sec(t2,list,e){return '<div><div style="font-size:14px;color:var(--mut)">'+t2+'</div><div style="font-size:14px;line-height:20px;color:var(--ink)">'+(list.length?list.map(esc).join('<br>'):'<span style="color:var(--mut)">'+e+'</span>')+'</div></div>'}
+  return '<div class="card noclick" style="left:'+l+'px;top:'+t+'px;width:'+w+'px;height:'+h+'px;gap:10px"><b>DESIGN.md</b><span>마이현대 · 하이테크센터 예약</span>'+sec('2. Color',toks.map(function(x){return x.title+' '+x.key.split(' ')[0]}),'등록된 토큰이 없어요')+sec('4. Components',comps.map(function(x){return x.title}),'등록된 컴포넌트가 없어요')+sec('7. Don’t',dos.map(function(r){return rTitle(r)}),'확정된 룰이 없어요')+'</div>';
+}
+
+function vth(){var d=S.vtheme==='dark';return d?{bg:'#14161B',tx:'#F2F4F7',mu:'#9AA1AD',ln:'#2C2F36',ac:'#6C9BFF',on:'#0B1020',ti:'rgba(108,155,255,.28)',ch:'#22252C',d:1}:{bg:'#FFFFFF',tx:'#14171D',mu:'#6B7280',ln:'#E3E6EB',ac:'#3D78FF',on:'#FFFFFF',ti:'rgba(61,120,255,.16)',ch:'#F1F3F6',d:0}}
+function calThumb(mode,th,c){
+  c=c||{h:24,fs:13};var H=c.h,r=H/2,B=th.ac;
+  var dot=function(d){return '<span style="display:inline-flex;width:'+H+'px;height:'+H+'px;border-radius:50%;background:'+B+';color:'+th.on+';align-items:center;justify-content:center">'+d+'</span>'};
+  var h='<div style="display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px;font-size:'+c.fs+'px;line-height:'+H+'px;text-align:center;color:'+th.tx+'">';
+  for(var d=1;d<=28;d++){
+    var st='height:'+H+'px',inner=d;
+    var edge=(d===12||d===15?'border-radius:'+r+'px 0 0 '+r+'px;':'')+(d===14||d===17?'border-radius:0 '+r+'px '+r+'px 0;':'');
+    if(mode==='single'&&d===12)inner=dot(d);
+    if(mode==='band'){
+      if(d===12||d===17)inner=dot(d);
+      if(d>=12&&d<=17)st+=';background:'+th.ti+';'+edge;
+    }
+    if(mode==='pill'&&d>=12&&d<=17)st+=';background:'+B+';color:'+th.on+';'+edge;
+    h+='<span style="'+st+'">'+inner+'</span>';
+  }
+  return h+'</div>';
+}
+var RH=22;
+function chkRow(ok,t){return '<div style="display:flex;gap:8px;align-items:center;min-height:'+RH+'px;font-size:13px;line-height:18px;border-top:1px solid var(--line);color:var(--ink)"><b style="width:14px;color:'+(ok?'#4BC38A':'#FF8A6B')+'">'+(ok?'✓':'✕')+'</b><span>'+t+'</span></div>'}
+function plainRow(t){return '<div style="display:flex;align-items:center;min-height:'+RH+'px;font-size:13px;line-height:18px;border-top:1px solid var(--line);color:var(--ink)"><span>'+t+'</span></div>'}
+function ab(l,t,w,inner,extra){return '<div class="abs" style="left:'+l+'px;top:'+t+'px;width:'+w+'px;'+(extra||'')+'">'+inner+'</div>'}
+var SPK='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" style="color:var(--acc-x);flex-shrink:0"><path d="M12 2l1.9 6.1L20 10l-6.1 1.9L12 18l-1.9-6.1L4 10l6.1-1.9z"/></svg>';
+var VSPEC={
+  ex:['# Date Picker','단일 날짜를 고르는 월 캘린더','· 선택 — 채움 원형 1개','· 셀 — 탭 영역 44px','· 상태 — 기본 / 선택 / 비활성','· 토큰 — 기존 토큰만 사용'],
+  A:['# Date Picker / Range · 밴드형','시작–종료일을 고르는 변형','· 선택 — 시작·종료 채움 원형 2개','· 구간 — 틴트 밴드 (면적 11%)','· 상태 — 시작 대기 / 구간 / 완료','· 신규 토큰 0 · Date Picker 상속'],
+  B:['# Range Calendar · 연속형','2개월 연속 스크롤 구간 캘린더','· 구간 — 채움 바 전체 (면적 34%)','· 셀 — 탭 영역 44px','· 상태 — 시작 대기 / 구간 / 완료','· 신규 토큰 2 · 룰 위배 C1 C3 C4']
+};
+var VTOK={
+  ex:[['color.accent','#3D78FF','#6C9BFF'],['color.text','#14171D','#F2F4F7'],['color.paper','#FFFFFF','#14161B'],['size.cell','44px','44px'],['radius.full','999px','999px']],
+  A:[['color.accent','#3D78FF','#6C9BFF'],['color.tint','rgba(61,120,255,.16)','rgba(108,155,255,.28)'],['color.text','#14171D','#F2F4F7'],['color.paper','#FFFFFF','#14161B'],['size.cell','44px','44px']],
+  B:[['color.accent','#3D78FF','#6C9BFF'],['color.text','#14171D','#F2F4F7'],['size.cell','44px','44px'],['range.bar','#3D78FF','#6C9BFF',1],['radius.bar','13px','13px',1]]
+};
+function vframe(k,mode,x,w,cls,th){
+  var tab=S.vtab[k]||'view',body='';
+  var tabs='<div style="display:flex;gap:2px;height:28px;margin:0 -12px 6px;padding:0 8px;border-bottom:1px solid '+th.ln+'">'+[['view','화면 미리보기'],['spec','스펙'],['tok','토큰']].map(function(t){var on=tab===t[0];return '<button data-act="vtab" data-c="'+k+'" data-t="'+t[0]+'" style="all:unset;cursor:pointer;font-size:13px;line-height:26px;padding:0 8px;color:'+(on?th.tx:th.mu)+';font-weight:'+(on?600:400)+';border-bottom:2px solid '+(on?th.ac:'transparent')+'">'+t[1]+'</button>'}).join('')+'</div>';
+  if(tab==='view')body=vscreen(k,mode,th);
+  else if(tab==='spec')body='<div style="font-size:12.5px;line-height:16px;color:'+th.tx+'">'+VSPEC[k].map(function(l,i){return '<div style="'+(i===0?'font-weight:600;':i===1?'color:'+th.mu+';':'')+'white-space:nowrap">'+esc(l)+'</div>'}).join('')+'</div>';
+  else body='<div style="font-size:12px;line-height:20px;color:'+th.tx+';font-family:ui-monospace,Menlo,monospace">'+VTOK[k].map(function(t){var v=th.d?t[2]:t[1],c=/^(#|rgba)/.test(v);return '<div style="display:flex;align-items:center;gap:6px;white-space:nowrap">'+(c?'<i style="width:10px;height:10px;border-radius:3px;background:'+v+';box-shadow:0 0 0 1px '+th.ln+'"></i>':'<i style="width:10px"></i>')+'<span style="flex:1">'+t[0]+(t[3]?' <b style="font-family:var(--font);font-size:11px;color:#E0883F;font-weight:600">신규</b>':'')+'</span><span style="color:'+th.mu+'">'+v+'</span></div>'}).join('')+'</div>';
+  return '<div class="card noclick'+cls+'" style="left:'+x+'px;top:152px;width:'+w+'px;height:282px;overflow:hidden;padding:0 12px;gap:0;background:'+th.bg+';color:'+th.tx+'">'+tabs+body+'</div>';
+}
+function vscreen(k,mode,th){
+  var ex=k==='ex',bg=th.d?'#0E1014':'#F3F3F4',cd=th.d?'#1B1E24':'#FFFFFF',N=th.d?th.ac:'#0F2A5C';
+  var pill=function(a,b){return '<span style="display:inline-flex;gap:3px;align-items:center;height:20px;padding:0 6px;border-radius:6px;font-size:10.5px;background:'+th.ch+';color:'+th.tx+';box-shadow:inset 0 0 0 1px '+th.ac+'"><span style="color:'+th.mu+'">'+a+'</span>'+b+'</span>'};
+  var right=ex?'<span style="font-size:11px;color:'+th.mu+'">방문일 10.12(월)</span>':'<span style="display:flex;gap:4px;align-items:center">'+pill('시작','10.12')+'<span style="font-size:10px;color:'+th.mu+'">→</span>'+pill('종료','10.17')+'</span>';
+  var chip=function(t,on){return '<span style="display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:11px;font-size:11px;background:'+(on?N:th.ch)+';color:'+(on?'#fff':th.mu)+'">'+t+'</span>'};
+  return '<div style="margin:0 -12px;height:242px;background:'+bg+';padding:8px 10px 0;overflow:hidden;color:'+th.tx+'">'
+   +'<div style="text-align:center;font-size:13px;font-weight:600;line-height:18px">일정 선택</div>'
+   +'<div style="display:flex;gap:3px;margin-top:6px"><i style="flex:1;height:3px;background:'+N+'"></i><i style="flex:1;height:3px;background:'+N+'"></i><i style="flex:1;height:3px;background:'+(th.d?'#2C2F36':'#DADCE1')+'"></i></div>'
+   +'<div style="margin-top:8px;border-radius:10px;background:'+cd+';padding:8px 8px 8px"><div style="display:flex;justify-content:space-between;align-items:center;height:20px;margin-bottom:6px;font-size:12px"><b style="color:'+th.tx+'">10월</b>'+right+'</div>'+calThumb(mode,th,{h:22,fs:12})+'<div style="display:flex;gap:5px;margin-top:8px">'+chip('10:00')+chip('11:00',1)+chip('13:00')+'</div></div>'
+   +'<div style="margin-top:8px;border-radius:10px 10px 0 0;background:'+cd+';padding:8px 10px;font-size:12px"><b style="color:'+th.tx+'">서비스</b><div style="display:flex;justify-content:space-between;margin-top:4px;color:'+th.mu+'"><span>엔진 오일 점검</span><b style="color:'+th.tx+'">✓</b></div></div></div>';
+}
+function boardVariant(){
+  var o=byId('system','s5'),h='',th=vth();
+  var H=function(tagHtml,title,sub){return tagHtml+'<div style="font-size:17px;line-height:22px;font-weight:600;margin-top:6px;color:var(--ink)">'+title+'</div><div style="font-size:13.5px;line-height:18px;color:var(--mut);margin-top:2px">'+sub+'</div>'};
+  /* 기획 요청 · 프로필 */
+  var AV='<span style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#8CA6FF,#3D5BD9);color:#fff;font-weight:600;font-size:14px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0">김</span>';
+  if(!S.vgen)h+='<button class="card sel" data-act="sel" data-id="s5" style="left:179px;top:13px;width:278px;height:128px;flex-direction:row;align-items:center;gap:12px;padding:0 14px">'+AV+'<span style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:18px">기획 김현대님 요청 · '+ST[o.state]+'</span><b style="font-size:15px;line-height:22px">2.0 버전에선 연속예약 기능이<br>새로 추가될거라서, 시작일과<br>종료일을 고르는 데이트 피커<br>고안이 필요합니다</b></span></button><div class="abs" style="left:136px;top:87px;width:43px;height:1px;background:var(--ink)"></div>';
+  else h+='<button class="card sel" data-act="sel" data-id="s5" style="left:36px;top:14px;width:400px;height:52px;flex-direction:row;align-items:center;gap:12px;padding:0 14px">'+AV+'<span style="display:flex;flex-direction:column"><span style="font-size:13px;line-height:18px">기획 김현대님 요청 · '+ST[o.state]+'</span><b style="font-size:15px;line-height:22px">2.0 연속예약 · 시작–종료일 데이트 피커</b></span></button>';
+  h+='<div class="abs" style="left:700px;top:20px;width:108px;height:34px;display:flex;border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--line)">'+[['light','라이트'],['dark','다크']].map(function(b){var on=S.vtheme===b[0];return '<button data-act="vtheme" data-k="'+b[0]+'" style="all:unset;cursor:pointer;flex:1;text-align:center;font-size:13px;line-height:34px;'+(on?'background:var(--acc-t);color:var(--acc-x);font-weight:600':'color:var(--mut)')+'">'+b[1]+'</button>'}).join('')+'</div>';
+  /* 기존 컴포넌트 열 */
+  h+=ab(36,76,222,H(S.vgen?'<span class="tag">기존 컴포넌트</span>':'<span class="tag" style="color:var(--acc-x)">신규 요청 1건</span>','Date Picker','단일 선택'));
+  h+=vframe('ex','single',36,222,'',th);
+  h+='<div class="cap abs" style="left:36px;top:442px">컴포넌트 룰 4</div>'+ab(36,464,222,plainRow('C1 선택 = 채움 원형')+plainRow('C2 탭 영역 44px 이상')+plainRow('C3 채움 면적 20% 이내')+plainRow('C4 신규 토큰 금지'));
+  if(!S.vgen)return h;
+  var A=o.state==='registered',Bs=S.vres.B,em=function(k){return S.emerge[k]?' emerge':''};
+  /* A안 */
+  h+='<div class="abs'+em('va')+'" style="left:282px;top:76px;width:254px">'+H('<span class="tag g">룰 안에서 · 적합 4/4</span>','Range · 밴드형','기존 셀·토큰을 그대로 재사용')+'</div>';
+  h+=vframe('A','band',282,254,' gen'+em('va'),th);
+  h+='<div class="cap abs" style="left:282px;top:442px">룰 대조</div>'+ab(282,464,254,chkRow(1,'C1 시작·종료 모두 채움 원형')+chkRow(1,'C2 탭 영역 44px 유지')+chkRow(1,'C3 채움 면적 11%')+chkRow(1,'C4 신규 토큰 0'));
+  h+=ab(282,560,254,A?'<span class="tag g">등록됨 · Date Picker 변형 2</span>':'<button class="btn pri" style="width:100%;height:36px" data-act="dec" data-k="ok">변형으로 등록</button>');
+  /* B안 */
+  h+='<div class="abs'+em('vb')+'" style="left:554px;top:76px;width:254px">'+H('<span class="tag" style="background:rgba(255,170,90,.16);color:#FFB27A">룰 위배 · 적합 1/4</span>','Range Calendar · 연속형','얻는 것 · 구간이 한눈에 읽힘')+'</div>';
+  h+=vframe('B','pill',554,254,em('vb'),th);
+  h+='<div class="cap abs" style="left:554px;top:442px">룰 대조 · 새 컴포넌트 제안</div>'+ab(554,464,254,chkRow(0,'C1 연속 채움 바(원형 아님)')+chkRow(1,'C2 탭 영역 44px 유지')+chkRow(0,'C3 채움 면적 34%')+chkRow(0,'C4 신규 토큰 2'));
+  h+=ab(554,560,254,Bs==='prop'?'<span class="tag p">제안됨 · 룰 개정 검토 대기</span>':Bs==='hold'?'<span class="tag">보류</span>':'<div style="display:flex;gap:8px"><button class="btn sec" style="flex:1;height:36px" data-act="vprop" data-k="hold">보류</button><button class="btn pri" style="flex:2;height:36px" data-act="vprop" data-k="prop">새 컴포넌트로 제안</button></div>');
+  return h;
+}
+function boardSystem(){
+  var s1=byId('system','s1'),merged=s1.state==='registered',sel=byId('system',S.sel.system);
+  if(sel.id==='s5')return boardVariant();
+  var h='<div class="cap abs" style="left:36px;top:36px">토큰 · 색상</div>';
+  var sws=[[36,'#111111','#fff','text',null],[148,'#F5F6F8','#14171D','bg',null],[260,'#0F2A5C','#fff','primary','s2'],[372,'#FFFFFF','#14171D','paper',null]];
+  sws.forEach(function(w){var on=w[4]&&w[4]===sel.id;h+='<button class="sw'+((w[4]&&!on)?'':'')+'" '+(w[4]?'data-act="sel" data-id="'+w[4]+'"':'')+' style="left:'+w[0]+'px;top:72px;background:'+w[1]+';color:'+w[2]+';'+(on?'box-shadow:0 0 0 2px #2F6BFF,0 10px 24px rgba(47,107,255,.25);':'')+(w[4]?'':'opacity:.7;cursor:default;')+'">'+w[3]+'</button>'});
+  h+='<div class="cap abs" style="left:36px;top:204px">버튼 컴포넌트 · 변형 4</div>';
+  var on4=sel.id==='s4';
+  h+='<button class="card'+(on4?' sel':' dim')+'" data-act="sel" data-id="s4" style="left:36px;top:234px;width:430px;height:64px;flex-direction:row;align-items:center;gap:10px"><span class="btn pri" style="height:34px">Primary</span><span class="btn sec" style="height:34px">Secondary</span><span style="padding:0 8px">Ghost</span><span class="tag">Disabled</span></button>';
+  h+='<div class="cap abs" style="left:36px;top:326px">카드 컴포넌트 · '+(merged?'변형 3':'변형 9')+'</div>';
+  var on1=sel.id==='s1',n=merged?3:9,g='';
+  for(var i=0;i<9;i++)g+='<i class="'+(i>=3&&merged?'x':(i<3&&merged?'k':''))+'"></i>';
+  h+='<button class="card'+(on1?' sel':' dim')+'" data-act="sel" data-id="s1" style="left:36px;top:356px;width:310px;height:176px"><b>'+(merged?'등록됨 · 3종':'병합 제안 · 9종 → 3종')+'</b><span>'+(merged?'기본 · 선택됨 · 비활성':'구조는 같고 간격만 달라요')+'</span><div style="display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-top:6px">'+g.replace(/<i class="([^"]*)"><\/i>/g,function(_,c){return '<i style="display:block;height:34px;border-radius:6px;background:'+(c==='k'?'#EAF0FF':'#fff')+';box-shadow:0 0 0 '+(c==='k'?2:1)+'px '+(c==='k'?'#2F6BFF':'#D5D8DE')+';opacity:'+(c==='x'?.18:1)+';transition:all .3s"></i>'})+'</div></button>';
+  var on3=sel.id==='s3',s3=byId('system','s3');
+  h+='<button class="card'+(on3?' sel':' dim')+'" data-act="sel" data-id="s3" style="left:370px;top:356px;width:230px;height:100px"><b>하드코딩 색상 2건</b><span>'+ST[s3.state]+'</span></button>';
+  h+=mdCard(500,36,290,296);
+  S.sys.filter(function(x){return /^s\d\d/.test(x.id)}).forEach(function(x,i){h+='<button class="card new'+(x.id===sel.id?' sel':' dim')+'" data-act="sel" data-id="'+x.id+'" style="left:620px;top:'+(356+i*70)+'px;width:170px;height:60px"><b style="font-size:15px">'+esc(x.title)+'</b></button>'});
+  return h;
+}
+function board(){return S.mode==='rules'?boardRules():S.mode==='check'?boardCheck():boardSystem()}
+
+/* ---------- details / slots ---------- */
+function detailFor(){
+  var m=S.mode,o=cur(),kind,name,stateHtml,keyLbl,keyHtml,ev,scope,b1,b2,k1,k2;
+  if(m==='rules'){
+    kind='룰';name=rTitle(o);stateHtml='<span class="tag'+(o.state==='confirmed'?' g':' p')+'">'+RT[o.state]+'</span>'+(o.state==='ai'||o.state==='edited'?'<div class="cap" style="margin:8px 0 0">값을 고치면 “사람이 수정함”으로 표시</div>':'');
+    keyLbl='핵심 값 (직접 수정)';
+    keyHtml=o.val==null?'<div class="ev">값 없이 문장 그대로 적용되는 룰</div>':'<div class="valin"><span>기준값</span><input id="valin" type="number" value="'+o.val+'" aria-label="기준값" min="0"><span>'+(o.unit||'')+'</span><span class="st"><button data-act="step" data-d="-1" aria-label="낮추기">−</button><button data-act="step" data-d="1" aria-label="높이기">+</button></span></div>';
+    ev='<span class="hl" id="hlq2">'+esc(o.quote)+'</span><br><span>'+o.src+'</span>';scope='모든 화면 · 예외 없음'+(o.cur?'<br><span class="cap">현재 화면 '+o.cur+'</span>':'');
+    b1='수정 및 확정';k1='ok';b2='근거 원문 보기';k2='src';
+  }else if(m==='check'){
+    kind='진단';name=o.name;
+    stateHtml='<div class="resp">'+['pending','ok','rule','talk'].filter(function(x){return x!=='pending'||o.state==='pending'}).map(function(x){return '<button class="'+(o.state===x?'on':'')+'" data-act="resp" data-k="'+x+'">'+(x==='pending'?'응답 전':DT[x])+'</button>'}).join('')+'</div>';
+    keyLbl='핵심 값';keyHtml='<div class="valin" style="font-size:16px">'+esc(o.key)+'</div>';
+    var r=ruleOf(o);ev='룰 “'+esc(rTitle(r))+'” · '+r.src+(o.note?'<br>'+esc(o.note):'');scope='예약 플로우 화면 4개';
+    b1='수정안 보기';k1='fixbtn';b2='메모 보드에 저장';k2='memo';
+    if(S.fix&&o.scr==='p1'){b1=S.dv===o.id?'배리에이션 접기':'이 진단 배리에이션 보기';k1='dvar'}
+  }else{
+    kind=o.kind;name=o.title;stateHtml='<span class="tag'+(o.state==='registered'?' g':' p')+'">'+ST[o.state]+'</span>';
+    keyLbl='핵심 값';keyHtml='<div class="valin" style="font-size:16px">'+esc(o.key)+'</div>';ev=esc(o.src);scope=esc(o.scope);
+    b1=o.reg;k1='ok';b2='보류';k2='hold';
+  }
+  var sl=function(c,t){return '<div><div class="cap">'+c+'</div>'+t+'</div>'};
+  return '<div class="det"><div><div class="cap">① 종류 · 이름</div><div class="cap" style="margin:0;color:var(--mut)">'+kind+'</div><div style="font-size:20px;line-height:28px;font-weight:600">'+esc(name)+'</div></div>'+sl('② 상태',stateHtml)+sl('③ '+keyLbl,keyHtml)+sl('④ 근거','<div class="ev">'+ev+'</div>')+sl('⑤ 영향 범위','<div>'+scope+'</div>')+'<div style="flex:1"></div><div style="display:flex;flex-direction:column;gap:8px"><button class="btn pri" data-act="d-'+k1+'">'+b1+'</button><button class="btn sec" data-act="d-'+k2+'">'+b2+'</button></div></div>';
+}
+function threadHtml(){
+  if(!S.thread.length)return '<div class="thread"><div class="prog" style="padding:20px 4px">항목을 고르고 아래에서 요청. 결과는 “변경 사항”으로 쌓이고 되돌릴 수 있음.</div></div>';
+  var h='';
+  S.thread.forEach(function(e,i){
+    if(e.t==='user')h+='<div class="msg">'+(e.chip?'<span class="chipx" style="align-self:flex-start">'+esc(e.chip)+'</span>':'')+'<span>'+esc(e.text)+'</span></div>';
+    if(e.t==='prog')h+='<div class="prog">'+esc(e.text)+'</div>';
+    if(e.t==='ans'){
+      h+='<div class="msg"><span>'+esc(e.text)+'</span>'+e.ev.map(function(v){return '<div class="evc" style="background:var(--sub)"><b>'+esc(v[0])+'</b>'+esc(v[1])+'</div>'}).join('')+(e.act&&!e.used?'<button class="btn pri" style="height:36px" data-act="apply" data-key="'+e.act.key+'" data-i="'+i+'">'+e.act.label+'</button>':'')+'</div>';
+    }
+    if(e.t==='chg')h+='<div class="chg'+(e.undone?' undone':'')+'"><div class="h"><span>'+e.title+'</span>'+(e.undone?'<span style="font-weight:400;font-size:14px;color:var(--mut)">되돌림</span>':'<button data-act="undo" data-id="'+e.id+'">되돌리기</button>')+'</div>'+e.rows.map(function(r){return '<div class="r"><span>'+esc(r[1])+'</span><span style="color:var(--mut);white-space:nowrap">'+esc(r[0])+'</span></div>'}).join('')+'</div>';
+  });
+  var pend=items(S.mode).filter(function(i){return i.pend}).length;
+  /* 확인 필요 안내 카드는 대화창이 밀려서 제거 */
+  return '<div class="thread" id="thread">'+h+'</div>';
+}
+function inputBox(){
+  var o=cur();
+  return '<div class="pad"><div class="glass box"><div><span class="chipx">'+esc(chipLabel())+'</span></div><div style="display:flex;gap:8px;align-items:flex-start;flex:1"><input class="askin" id="ask" value="'+esc(S.draft)+'" placeholder="요청 입력 · 예: '+suggestions(S.mode)[0]+'" autocomplete="off"></div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div style="display:flex;gap:6px;flex-wrap:wrap">'+suggestions(S.mode).slice(0,2).map(function(s){return '<button class="slash" data-act="chip" data-t="'+esc(s)+'">'+esc(clb(s).length>9?clb(s).slice(0,9)+'…':clb(s))+'</button>'}).join('')+'</div><button class="orb" style="width:34px;height:34px" data-act="send" aria-label="보내기">↑</button></div></div></div>';
+}
+var SESS={rules:'예약 플로우 · 룰 추출',check:'예약 화면 · 점검',system:'시스템 · 추출'};
+function rightPanel(withBar){
+  var tabs='<div class="tabs"><button class="'+(S.tab==='agent'?'on':'')+'" data-act="tab" data-t="agent">에이전트</button><button class="'+(S.tab==='detail'?'on':'')+'" data-act="tab" data-t="detail">상세</button></div>';
+  var body=S.tab==='agent'?'<div class="sess"><div><span>'+SESS[S.mode]+'</span><span style="color:var(--mut)">⌄</span></div><div style="flex:none;width:40px;justify-content:center;font-size:20px;color:var(--mut)">+</div></div>'+threadHtml()+(withBar?'':inputBox()):detailFor();
+  return '<div class="right">'+tabs+body+'</div>';
+}
+function barB(){
+  var chips=suggestions(S.mode).map(function(s){return '<button class="slash" data-act="chip" data-t="'+esc(s)+'">'+esc(clb(s))+'</button>'}).join('');
+  return '<div class="haze" style="left:100px;top:620px;width:640px;height:150px"></div><div class="abs" style="left:140px;top:612px;display:flex;gap:8px">'+chips+'</div><div class="glass abs" style="left:140px;top:654px;width:560px;height:60px;border-radius:30px;display:flex;align-items:center;gap:10px;padding:0 10px 0 18px"><span class="chipx">'+esc(chipLabel())+'</span><input class="askin" id="ask" value="'+esc(S.draft)+'" placeholder="질문 입력 · 예: '+suggestions(S.mode)[0]+'" autocomplete="off"><button class="orb" data-act="send" aria-label="보내기">↑</button></div>';
+}
+function topAB(){
+  return '<div class="top"><div class="logo"><i></i><b style="font-weight:600">Luminous Audit</b><span>/</span><span>하이테크센터 예약 v0.3</span></div><div class="seg">'+MODES.map(function(x){return '<button class="'+(S.mode===x[0]?'on':'')+'" data-act="mode" data-m="'+x[0]+'">'+x[2]+'</button>'}).join('')+'</div><div class="right-top"><span>공유</span><span class="av"></span></div></div>';
+}
+function viewAB(withBar){
+  return topAB()+leftList()+'<div class="canvas" style="left:240px;width:840px;height:762px">'+board()+(withBar?barB():'<div class="toolbar" style="left:310px;top:698px"><b style="color:var(--ink);font-weight:600">선택</b><span>이동</span><span>코멘트</span><span>|</span><span>100%</span></div>')+'</div>'+rightPanel(withBar);
+}
+
+/* ---------- C: queue ---------- */
+function topC(){
+  var seg=MODES.map(function(x,i){return '<button class="'+(S.mode===x[0]?'on':'')+'" data-act="mode" data-m="'+x[0]+'">'+x[1]+' · '+x[2]+'<span class="n">'+cnt(x[0])+'</span></button>'+(i<2?'<span class="arr">→</span>':'')}).join('');
+  return '<div class="top c"><div class="logo"><i></i><b style="font-weight:600">Luminous Audit</b><span>/</span><span>하이테크센터 예약 v0.3</span></div><div class="seg" style="padding:4px;border-radius:14px">'+seg+'</div><div class="right-top"><span>공유</span><span class="av"></span></div></div>';
+}
+function tabsC(n){return '<div class="qtabs"><button class="'+(S.leftTab==='queue'?'on':'')+'" data-act="ltab" data-t="queue">대기<span class="n">'+n+'</span></button><button class="'+(S.leftTab==='all'?'on':'')+'" data-act="ltab" data-t="all">전체 목록</button></div>'}
+function allList(){
+  var m=S.mode,it=items(m),h='<div style="overflow:auto;display:flex;flex-direction:column;gap:2px;flex:1;margin:0 -8px;padding:0 8px">';
+  function row(x){var on=x.id===selId();return '<button class="li'+(on?' on':'')+(x.pend?'':' done')+'" data-act="sel" data-id="'+x.id+'"><span>'+(on?'<i class="dot"></i>':'')+esc(x.title)+'</span><small>'+x.tag+'</small></button>'}
+  if(m==='rules'){
+    h+='<div class="sec-h" style="padding-left:4px">자료 · 3</div>'+[['인터뷰 #1','PO'],['인터뷰 #2','UI 디자이너'],['인터뷰 #3','시스템 운영']].map(function(r){return '<div class="ro" style="padding:4px 4px"><span>'+r[0]+'</span><span>'+r[1]+'</span></div>'}).join('');
+    var f=S.flt,list=it.filter(function(x){return f==='all'||(f==='pend'?x.pend:!x.pend)});
+    h+='<div class="sec-h" style="padding-left:4px">룰 · '+it.length+'</div><div class="fl">'+[['all','전체'],['pend','확정 전'],['done','확정·보류']].map(function(b){return '<button class="slash'+(f===b[0]?' on':'')+'" data-act="flt" data-f="'+b[0]+'">'+b[1]+'</button>'}).join('')+'</div>'+list.map(row).join('')+(list.length?'':'<div class="cap" style="padding:8px 4px">해당하는 룰이 없어요</div>');
+  }else if(m==='check'){
+    var ck=!!S.checked[S.screen];
+    h+='<div class="sec-h" style="padding-left:4px">화면 · 3</div>'+['p1','p2','p3'].map(function(id){var on=S.screen===id,ds=S.diags.filter(function(d){return d.scr===id}),pc=ds.filter(function(d){return d.state==='pending'}).length,st=S.checked[id]?(pc?pc+'건 대기':'완료'):'점검 전';return '<button class="li'+(on?' on':'')+'" data-act="scr" data-id="'+id+'"><span><i class="pg"></i>'+SCRN[id]+'</span><small>'+st+'</small></button>'}).join('');
+    h+='<div class="sec-h" style="padding-left:4px">진단 · '+(ck?it.length:0)+'</div>'+(ck?it.map(row).join(''):'<div class="cap" style="padding:8px 4px">이 화면은 아직 점검 전</div>');
+  }else{
+    var g=[['토큰',function(x){return byId('system',x.id).kind==='토큰'}],['컴포넌트',function(x){var k=byId('system',x.id).kind;return k==='컴포넌트'||k==='병합 제안'}],['오류',function(x){return byId('system',x.id).kind==='오류'}]];
+    g.forEach(function(gr){var l=it.filter(gr[1]);h+='<div class="sec-h" style="padding-left:4px">'+gr[0]+' · '+l.length+'</div>'+l.map(row).join('')});
+  }
+  return h+'</div>';
+}
+function queue(){
+  var it=items(S.mode),pend=it.filter(function(i){return i.pend}),dn=it.filter(function(i){return !i.pend});
+  var tot=it.length,d=tot-pend.length;
+  var h='<div class="queue">'+tabsC(pend.length);if(S.leftTab==='all')return h+allList()+'</div>';h+='<div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:16px;font-weight:600">'+(S.mode==='check'?'응답 대기 ':'확인 대기 ')+pend.length+'</b><span class="cap">AI 우선순위순</span></div>';
+  pend.concat(dn).forEach(function(x){h+='<button class="qi'+(x.id===selId()?' on':'')+(x.pend?'':' done')+(S.newIds[x.id]?' new':'')+(S.emerge[x.id]?' emerge':'')+'" data-act="sel" data-id="'+x.id+'"><b>'+esc(x.title)+'</b><span class="s">'+esc(x.sub)+'</span><span><span class="tag'+(x.pend?(S.newIds[x.id]?' p':''):' g')+'">'+(S.newIds[x.id]&&x.pend?'새로 추가 · ':'')+x.tag+'</span></span></button>'});
+  if(!it.length)h+='<div class="qi" style="cursor:default"><b>아직 점검 전</b><span class="s">화면을 고르고 아래 /점검을 누르거나 AI에게 물어보세요.</span></div>';
+  h+='<div style="flex:1"></div><div style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between" class="cap"><span>진행</span><span>'+d+' / '+tot+' '+(S.mode==='system'?'등록':S.mode==='check'?'응답':'확정')+'</span></div><div class="prog-b"><i style="width:'+(tot?Math.round(d/tot*100):0)+'%"></i></div></div></div>';
+  return h;
+}
+function focusC(){
+  var m=S.mode,o=cur(),h='';
+  if(m==='rules'){
+    h+='<div class="cap abs" style="left:60px;top:36px">근거 · '+DOCS[o.doc]+'</div><div class="card noclick" style="left:60px;top:70px;width:330px;height:200px"><b>'+DOCS[o.doc]+'</b><span>'+DSUB[o.doc]+'</span><span class="hl" id="hlq">'+esc(o.quote)+'</span></div><div class="abs" style="left:390px;top:170px;width:90px;height:1px;background:var(--acc)"></div>';
+    h+='<div class="cap abs" style="left:480px;top:36px">AI가 추출한 룰</div><div class="card sel" style="left:480px;top:70px;width:480px;height:200px;cursor:default"><span>룰 · '+RT[o.state]+'</span><div style="font-size:22px;line-height:32px;font-weight:600;color:var(--ink)">'+ruleInline(o)+'</div><span>숫자를 눌러 직접 고칠 수 있어요</span><div style="display:flex;gap:6px"><span class="tag">'+RT[o.state]+'</span><span class="tag">'+o.src+'</span></div></div>';
+    h+='<div class="cap abs" style="left:60px;top:310px">이 룰로 보면</div>';
+    h+='<div class="card noclick" style="left:60px;top:344px;width:330px;height:120px"><b>'+(o.cur?'현재 화면 '+o.cur:'현재 화면 해당 없음')+'</b><span>'+(o.cur&&o.val!=null&&parseFloat(o.cur)>o.val?'기준 '+o.val+o.unit+'을 초과해요':'기준 이내예요')+'</span></div><div class="card noclick" style="left:410px;top:344px;width:260px;height:120px"><b>적용 범위</b><span>모든 화면 · 예외 없음</span></div><div class="card noclick" style="left:690px;top:344px;width:270px;height:120px"><b>충돌 룰</b><span>없음</span></div>';
+  }else if(m==='check'){
+    h+='<div class="cap abs" style="left:60px;top:36px">원본 · '+SCRN[S.screen]+'</div>'+phoneHtml(60,66,230,470,0,false);
+    if(!o){var ck2=!!S.checked[S.screen],g2=S.fix&&S.screen==='p1';if(g2)h+='<div class="cap abs" style="left:330px;top:36px">새로 생성 · 수정안</div>'+phoneHtml(330,66,230,470,0,true).replace('class="phone"','class="phone gen'+(S.emerge.gen?' emerge':'')+'"');return h+'<div class="card noclick" style="left:'+(g2?'590':'380')+'px;top:70px;width:'+(g2?'400':'440')+'px;height:150px"><b>'+(ck2?'진단 '+items('check').length+'건이 나왔어요':'아직 점검 전')+'</b><span>'+(ck2?'왼쪽 대기 큐에서 진단을 고르면 이 자리에서 응답할 수 있어요.':'아래 /점검 버튼을 누르거나 AI에게 물어보면 화면을 읽고 진단 카드를 만들어요.')+'</span></div>'}
+    h+='<div class="abs" style="left:290px;top:470px;width:90px;height:1px;background:var(--acc)"></div>';
+    var rb=[['talk','논의 필요'],['rule','룰 반영 필요'],['ok','의도와 맞음']].map(function(b){var on=o.state===b[0];return '<button class="btn '+(on?'pri':'sec')+'" style="height:36px;padding:0 14px" data-act="dec" data-k="'+b[0]+'">'+b[1]+'</button>'}).join('');
+    h+='<div class="card sel" style="left:380px;top:370px;width:420px;height:200px;cursor:default"><span>진단 '+o.n+' · '+(o.state==='pending'?'AI 질문':'응답 · '+DT[o.state])+'</span><b style="font-size:18px;line-height:26px">'+esc(o.q)+'</b><span>'+esc(o.note||o.key)+'</span><div style="flex:1"></div><div style="display:flex;gap:8px">'+rb+'</div></div>';
+    var r=ruleOf(o);h+='<div class="card noclick" style="left:820px;top:370px;width:260px;height:200px"><b>근거 룰</b><span>'+esc(rTitle(r))+'</span><span>'+r.src+(r.cur?' · 현재 '+r.cur:'')+'</span>'+(S.fix&&o.scr==='p1'?'<div style="flex:1"></div><button class="btn sec" style="height:36px;font-size:14px" data-act="dvar" data-id="'+o.id+'">'+(S.dv===o.id?'배리에이션 접기':'이 진단 배리에이션 보기')+'</button>':'')+'</div>';
+    if(S.screen==='p1'&&S.fix&&S.dv===o.id)h+=dvCards(o.id,540,70,250,200,12,false);
+    if(S.screen==='p1'&&S.fix)h+='<div class="cap abs" style="left:380px;top:36px">새로 생성 · 수정안</div><div class="abs" style="left:380px;top:70px;width:134px;height:290px;transform:scale(.55);transform-origin:0 0;width:244px;height:528px">'+phoneHtml(0,0,244,528,0,true).replace('class="phone"','class="phone gen'+(S.emerge.gen?' emerge':'')+'"')+'</div>';
+    h+=(S.dv===o.id?'':'<div class="card noclick" style="left:780px;top:70px;width:300px;background:var(--sub)"><span>● 논의 메모'+(S.memos.length?' '+S.memos.length+'건':'')+'</span><span style="color:var(--ink)">'+(S.memos.length?esc(byId('check',S.memos[S.memos.length-1]).q):'“논의 필요” 응답이 여기에 모여요')+'</span></div>');
+  }else{
+    if(o.id==='s5')return '<div class="abs" style="left:20px;top:10px;width:840px;height:620px;transform:scale(.86);transform-origin:0 0">'+boardVariant()+'</div>';
+    var s1=byId('system','s1'),merged=s1.state==='registered';
+    h+='<div class="cap abs" style="left:40px;top:36px">확정된 화면 3개</div>'+[0,1,2].map(function(i){return '<div class="card noclick dim" style="left:'+(40+i*94)+'px;top:70px;width:80px;height:150px;box-shadow:0 0 0 1px #A5A9B3"></div>'}).join('')+'<div class="abs" style="left:308px;top:150px;width:70px;height:1px;background:var(--acc)"></div>';
+    h+='<div class="cap abs" style="left:378px;top:36px">AI가 추출한 '+o.kind+'</div><div class="card sel" style="left:378px;top:70px;width:440px;height:200px;cursor:default"><span>'+o.kind+' · '+ST[o.state]+'</span><b style="font-size:20px;line-height:28px">'+esc(o.title)+'</b><span>'+esc(o.key)+'</span><div style="display:flex;gap:6px"><span class="tag">'+ST[o.state]+'</span><span class="tag">'+esc(o.src)+'</span></div></div>';
+    var g='';for(var i=0;i<9;i++){var k=merged&&i<3,x=merged&&i>=3;g+='<i style="display:block;height:30px;border-radius:6px;background:'+(k?'#EAF0FF':'#fff')+';box-shadow:0 0 0 '+(k?2:1)+'px '+(k?'#2F6BFF':'#D5D8DE')+';opacity:'+(x?.18:1)+';transition:all .3s"></i>'}
+    h+='<div class="cap abs" style="left:40px;top:310px">'+(o.id==='s1'?'병합하면':'이 항목은')+'</div>'+(o.id==='s1'?'<div class="card noclick" style="left:40px;top:344px;width:260px;height:120px"><b>'+(merged?'등록됨 · 3종':'9종 → 3종')+'</b><span>기본 · 선택됨 · 비활성</span><div style="display:grid;grid-template-columns:repeat(9,1fr);gap:4px;margin-top:4px">'+g+'</div></div>':'<div class="card noclick" style="left:40px;top:344px;width:260px;height:120px"><b>'+esc(o.key)+'</b><span>'+esc(o.sub)+'</span></div>')+'<div class="card noclick" style="left:315px;top:344px;width:260px;height:120px"><b>영향 범위</b><span>'+esc(o.scope)+'</span></div><div class="card noclick" style="left:590px;top:344px;width:228px;height:120px"><b>다크 짝</b><span>자동 생성 가능</span></div>'+mdCard(850,70,230,394);
+  }
+  return h;
+}
+function ruleInline(o){
+  if(o.val==null)return esc(o.tpl);
+  var p=o.tpl.split('{v}');
+  return esc(p[0])+'<input id="valin" type="number" value="'+o.val+'" aria-label="기준값" style="all:unset;width:'+(String(o.val).length*14+20)+'px;text-align:center;font-weight:600;background:#fff;box-shadow:0 0 0 1.5px var(--acc);border-radius:8px;padding:0 6px;margin:0 2px">'+esc(p.length>1?p[1]:'');
+}
+var DEC={rules:[['수정','edit','sec'],['보류','hold','sec'],['확정','ok','pri']],check:[['논의 필요','talk','sec'],['룰 반영 필요','rule','sec'],['의도와 맞음','ok','pri']],system:[['예외 처리','hold','sec'],['보류','hold','sec'],['시스템에 등록','ok','pri']]};
+function whyC(){
+  var o=cur();
+  if(S.mode==='rules')return o.cur&&o.val!=null&&parseFloat(o.cur)>o.val?'AI 제안: 값은 그대로 두고 확정해도 됩니다 · 근거 문장 1건':'AI 제안: 현재 화면이 기준 안에 있어요 · 근거 문장 1건';
+  if(S.mode==='check')return o.state==='pending'?'AI 질문에 답해주세요 · 의도와 맞으면 이 화면에서는 예외 처리됩니다':'응답을 마쳤어요 · 다음 항목으로 이동하세요 (→)';
+  if(o.id==='s5')return S.vgen?'AI 제안: 룰 안의 밴드형이 적합 4/4 · 연속형은 룰 3개 위배':'AI에게 “/변형 제안”을 요청하면 기존 룰 기준 변형안을 만들어요';
+  return o.id==='s1'?'AI 제안: 카드 9종은 구조가 같아 3종으로 병합할 수 있어요 · 화면 12개 영향':'AI 제안: 확정된 화면 3개에서 반복해서 쓰였어요';
+}
+function dock(){
+  var fade=S.answer?' fade':'';
+  var decs=DEC[S.mode].map(function(b){var lbl=b[0];if(S.mode==='system'&&b[1]==='ok')lbl=cur().reg||lbl;if(S.mode==='system'&&lbl==='예외 처리'){return '<button class="btn sec" data-act="dec" data-k="hold">예외 처리</button>'}return '<button class="btn '+b[2]+'" data-act="dec" data-k="'+b[1]+'">'+lbl+'</button>'}).join('');
+  if(S.mode==='system'){decs='<button class="btn sec" data-act="dec" data-k="hold">보류</button><button class="btn pri" data-act="dec" data-k="ok">'+(cur().reg||'시스템에 등록')+'</button>'}
+  var chips=S.answer?'':'<div style="display:flex;gap:20px;align-items:center">'+suggestions(S.mode).map(function(s){return '<button class="hint" data-act="chip" data-t="'+esc(s)+'">'+SPK+esc(clb(s))+'</button>'}).join('')+'</div>';
+  return '<div class="dock">'+((S.mode==='check'||(S.mode==='system'&&cur().id==='s5'&&!S.vgen))?'':'<div class="dec'+fade+'"><span style="font-size:15px;line-height:22px;display:inline-flex;align-items:center;gap:8px">'+SPK+esc(whyC())+'</span><div class="b">'+decs+'</div></div>')+chips+'<div class="pbar"><div class="haze" style="left:60px;top:-14px;width:600px;height:90px"></div><div class="glass"><span class="chipx">'+esc(chipLabel())+'</span><input class="askin" id="ask" value="'+esc(S.draft)+'" placeholder="질문 입력 · 예: '+suggestions(S.mode)[0]+'" autocomplete="off"><span class="cap" style="flex-shrink:0">⌘K</span><button class="orb" style="width:42px;height:42px" data-act="send" aria-label="보내기">↑</button></div></div></div>';
+}
+function answerPanel(){
+  var a=S.answer;if(!a)return '';
+  if(a.pending)return '<div class="glass apanel"><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--acc-x);font-weight:600">AI가 읽는 중</span></div><div><div class="cap" style="margin-bottom:4px">내 질문</div><div>'+esc(a.q)+'</div></div><div class="prog">'+esc(a.prog)+'</div></div>';
+  return '<div class="glass apanel"><div style="display:flex;justify-content:space-between;font-size:14px"><span style="color:var(--acc-x);font-weight:600">AI 답변 · 확정 전</span><button data-act="close-ans" style="all:unset;cursor:pointer;color:var(--mut)">닫기 ✕</button></div><div><div class="cap" style="margin-bottom:4px">내 질문</div><div>'+esc(a.q)+'</div></div><div><div class="cap" style="margin-bottom:4px">답변</div><div class="t">'+esc(a.text)+'</div></div>'+(a.ev.length?'<div><div class="cap" style="margin-bottom:6px">근거</div><div style="display:flex;flex-direction:column;gap:8px">'+a.ev.map(function(v){return '<div class="evc"><b>'+esc(v[0])+'</b>'+esc(v[1])+'</div>'}).join('')+'</div></div>':'')+'<div style="display:flex;flex-direction:column;gap:8px">'+(a.act?'<button class="btn pri" data-act="apply" data-key="'+a.act.key+'">'+a.act.label+'</button>':'')+'<button class="btn sec" data-act="close-ans">닫기</button></div></div>';
+}
+function holdAll(){
+  var m=S.mode,n=0;
+  if(m==='rules')S.rules.forEach(function(r){if(r.state==='ai'||r.state==='edited'){r.state='held';n++}});
+  if(m==='check')S.diags.forEach(function(d){if(d.state==='pending'&&visDiag(d)){d.state='talk';if(S.memos.indexOf(d.id)<0)S.memos.push(d.id);n++}});
+  if(m==='system')S.sys.forEach(function(x){if(x.state==='ai'||x.state==='merge'||x.state==='error'){x.state='held';n++}});
+  toast(n+'건 메모 보드에 저장');
+}
+function rcard(x){
+  var o=byId(S.mode,x.id),on=x.id===selId(),m=S.mode,h='',isNew=S.newIds[x.id];
+  var tag='<span class="tag'+(x.pend?' p':' g')+'">'+(isNew?'새로 추가 · ':'')+x.tag+'</span>';
+  if(!on)return '<button class="rc'+(x.pend?'':' done')+(S.emerge[x.id]?' emerge':'')+'" data-act="sel" data-id="'+x.id+'"><div>'+tag+'</div><b>'+esc(x.title)+'</b><span class="src">'+esc(x.sub)+'</span></button>';
+  h='<div class="rc on"><div style="display:flex;justify-content:space-between;align-items:center"><span class="chipx">선택됨</span>'+tag+'</div><b>'+esc(x.title)+'</b>';
+  if(m==='rules'){
+    h+='<span class="src">'+esc(o.src)+' · '+esc(o.quote)+'</span>'+(o.cur?'<div class="chk"><span>현재 화면</span><b style="font-size:14px;line-height:20px">'+esc(o.cur)+'</b></div>':'');
+    if(o.val!=null)h+='<div class="valin"><span>기준값</span><input id="valin" type="number" value="'+o.val+'" aria-label="기준값" min="0"><span>'+(o.unit||'')+'</span><span class="st"><button data-act="step" data-d="-1" aria-label="낮추기">−</button><button data-act="step" data-d="1" aria-label="높이기">+</button></span></div>';
+    h+='<button class="btn pri" data-act="dec" data-k="ok">룰 확정</button><button class="btn sec" data-act="dec" data-k="hold">보류</button>';
+  }else if(m==='check'){
+    h+='<div style="font-size:15px;line-height:22px;font-weight:500">'+esc(o.q)+'</div><span class="src">'+esc(o.note||o.key)+'</span><div class="chk"><span>근거 룰</span><span>'+esc(rTitle(ruleOf(o)))+'</span></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+[['talk','논의 필요'],['rule','룰 반영 필요'],['ok','의도와 맞음']].map(function(b){return '<button class="btn '+(o.state===b[0]?'pri':'sec')+'" style="height:34px;padding:0 12px;font-size:14px" data-act="dec" data-k="'+b[0]+'">'+b[1]+'</button>'}).join('')+'</div>';
+  }else{
+    h+='<span class="src">'+esc(o.key)+'</span><div class="chk"><span>영향 범위</span><span>'+esc(o.scope)+'</span></div><button class="btn pri" data-act="dec" data-k="ok">'+(o.reg||'시스템에 등록')+'</button><button class="btn sec" data-act="dec" data-k="hold">보류</button>';
+  }
+  return h+'</div>';
+}
+function barGen(left,w,sugs){
+  var chips=sugs.map(function(q){return '<button class="slash" data-act="chip" data-t="'+esc(q)+'">'+esc(clb(q))+'</button>'}).join('');
+  return '<div class="haze" style="left:'+(left-40)+'px;top:620px;width:'+(w+80)+'px;height:150px"></div><div class="abs" style="left:'+left+'px;top:612px;display:flex;gap:8px;flex-wrap:wrap;width:'+w+'px">'+chips+'</div><div class="glass abs" style="left:'+left+'px;top:654px;width:'+w+'px;height:60px;border-radius:30px;display:flex;align-items:center;gap:10px;padding:0 10px 0 18px"><span class="chipx">'+esc(chipLabel())+'</span><input class="askin" id="ask" value="'+esc(S.draft)+'" placeholder="질문 입력 · 예: '+suggestions(S.mode)[0]+'" autocomplete="off"><button class="orb" data-act="send" aria-label="보내기">↑</button></div>';
+}
+function viewD(){
+  var m=S.mode,it=items(m),pend=it.filter(function(i){return i.pend}),list=pend.concat(it.filter(function(i){return !i.pend}));
+  var chat='<div class="chatp"><div class="hd"><i style="width:8px;height:8px;border-radius:50%;background:var(--acc)"></i>대화</div>'+threadHtml()+'<div class="sug"><span class="cap">이런 요청</span>'+suggestions(m).map(function(q){return '<button data-act="chip" data-t="'+esc(q)+'">“'+esc(clb(q))+'”</button>'}).join('')+'</div></div>';
+  var tabs=m==='check'?'<div class="abs" style="left:16px;top:6px;display:flex;gap:6px;z-index:3">'+['p1','p2','p3'].map(function(id){return '<button class="slash'+(S.screen===id?' on':'')+'" data-act="scr" data-id="'+id+'">'+SCRN[id]+(S.checked[id]?'':' · 점검 전')+'</button>'}).join('')+'</div>':'';
+  var cv='<div class="canvas" style="left:280px;width:820px;height:762px">'+tabs+'<div style="position:absolute;left:0;top:0;width:840px;height:762px;transform:scale(.976);transform-origin:0 0">'+board()+'</div>'+barGen(80,660,suggestions(m))+'</div>';
+  var ttl=m==='rules'?'추출된 룰 후보':m==='check'?'AI 진단':'추출된 항목';
+  var right='<div class="rcol"><div class="hd"><div style="display:flex;gap:8px;align-items:center"><b style="font-weight:600">'+ttl+'</b><span class="tag p">'+it.length+'건</span></div><span class="cap">한 건씩 응답</span></div><div class="rlist">'+(list.length?list.map(rcard).join(''):'<div class="rc" style="cursor:default"><b>아직 점검 전</b><span class="src">화면을 고르고 /점검을 누르세요.</span></div>')+'</div><div class="rfoot"><div style="display:flex;justify-content:space-between"><span class="cap">미응답</span><b style="font-weight:600">'+pend.length+'건</b></div><button class="btn sec" data-act="holdall"'+(pend.length?'':' disabled')+'>전부 메모 보드에 저장</button></div></div>';
+  return topC()+chat+cv+right;
+}
+function pageLabel(){return S.mode==='rules'?'룰 · 추출된 룰':S.mode==='check'?'화면 · '+SCRN[S.screen]:'디자인 시스템 · 컴포넌트'}
+function entHtml(e,i){
+  var h='';
+  if(e.t==='user')h+='<div class="msg">'+'<span>'+esc(e.text)+'</span></div>';
+  if(e.t==='prog')h+='<div class="prog">'+esc(e.text)+'</div>';
+  if(e.t==='ans')h+='<div class="msg"><span>'+esc(e.text)+'</span>'+e.ev.map(function(v){return '<div class="evc" style="background:var(--sub)"><b>'+esc(v[0])+'</b>'+esc(v[1])+'</div>'}).join('')+(e.act&&!e.used?'<button class="btn pri" style="height:36px" data-act="apply" data-key="'+e.act.key+'" data-i="'+i+'">'+e.act.label+'</button>':'')+'</div>';
+  if(e.t==='chg')h+='<div class="chg'+(e.undone?' undone':'')+'"><div class="h"><span>'+e.title+'</span>'+(e.undone?'<span style="font-weight:400;font-size:14px;color:var(--mut)">되돌림</span>':'<button data-act="undo" data-id="'+e.id+'">되돌리기</button>')+'</div>'+e.rows.map(function(r){return '<div class="r"><span>'+esc(r[1])+'</span><span style="color:var(--mut);white-space:nowrap">'+esc(r[0])+'</span></div>'}).join('')+'</div>';
+  return h;
+}
+function convGroups(){
+  var gs=[];
+  S.thread.forEach(function(e,i){
+    if(e.t==='user'){gs.push({k:i,m:e.m||'rules',chip:e.chip||'대화',ents:[[e,i]]});return}
+    var g=gs[gs.length-1];
+    if(e.t==='chg'&&(!g||g.m!==e.m)){gs.push({k:i,m:e.m||S.mode,chip:'변경 사항',ents:[[e,i]]});return}
+    if(!g){gs.push({k:i,m:e.m||S.mode,chip:'대화',ents:[]});g=gs[gs.length-1]}
+    g.ents.push([e,i]);
+  });
+  return gs;
+}
+function leftE(){
+  var G=[['룰',[['rules','','추출된 룰']]],['화면 점검',['p1','p2','p3'].map(function(id){return ['check',id,SCRN[id]]})],['디자인 시스템',[['system','','컴포넌트 · 토큰']]]];
+  var dd=S.dd?'<div class="ddl">'+G.map(function(g){return '<div class="g">'+g[0]+'</div>'+g[1].map(function(p){var on=S.mode===p[0]&&(p[0]!=='check'||S.screen===p[1]);return '<button class="'+(on?'on':'')+'" data-act="ddsel" data-m="'+p[0]+'" data-s="'+p[1]+'">'+p[2]+'</button>'}).join('')}).join('')+'</div>':'';
+  return '<div class="abs" style="left:16px;top:14px;width:208px;z-index:6"><button class="ddb" style="background:#fff;box-shadow:0 0 0 1px #E3E6EB,0 8px 20px rgba(20,23,29,.10)" data-act="ddtog"><span>'+esc(pageLabel())+'</span><span style="color:var(--mut)">'+(S.dd?'⌃':'⌄')+'</span></button>'+dd+'</div>';
+}
+function rightE(){
+  var m=S.mode,it=items(m),pend=it.filter(function(i){return i.pend}),list=pend.concat(it.filter(function(i){return !i.pend}));
+  var cats=MODES.map(function(x){return '<button class="'+(S.mode===x[0]?'on':'')+'" data-act="mode" data-m="'+x[0]+'">'+x[2]+'<span class="n">'+cnt(x[0])+'</span></button>'}).join('');
+  var gs=convGroups().filter(function(g){return g.m===m});
+  var conv=gs.length?gs.map(function(g,gi){var last=gi===gs.length-1,open=S.gop[g.k]===undefined?last:S.gop[g.k];return '<div class="egrp"><button class="eh" data-act="gtog" data-k="'+g.k+'"><span class="chipx">'+esc(g.chip)+'</span><span class="cap">'+g.ents.length+'건</span><span style="margin-left:auto;color:var(--mut)">'+(open?'⌃':'⌄')+'</span></button>'+(open?'<div class="eb">'+g.ents.map(function(x){return entHtml(x[0],x[1])}).join('')+'</div>':'')+'</div>'}).join(''):'<div class="prog" style="padding:4px 2px">이 카테고리의 대화가 아직 없어요. 항목을 고르고 아래에서 요청해 보세요.</div>';
+  return '<div class="rE"><div class="ecat">'+cats+'</div><div class="esec-h"><span>확인 대기 · '+it.length+'건</span><span class="cap" style="font-weight:400">한 건씩 응답</span></div><div class="elist">'+(list.length?list.map(rcard).join(''):'<div class="rc" style="cursor:default"><b>아직 점검 전</b><span class="src">화면을 고르고 /점검을 누르세요.</span></div>')+'</div><div class="esec-h"><span>대화 · '+gs.length+'</span><span class="cap" style="font-weight:400">대화별로 접고 펼쳐요</span></div><div class="econv" id="econv">'+conv+'</div>'+inputBox()+'</div>';
+}
+function viewE(){
+  return topAB()+'<div class="canvas" style="left:0;width:1016px;height:762px"><div class="abs" style="left:120px;top:56px;width:840px;height:706px">'+board()+'</div><div class="toolbar" style="left:400px;top:698px"><b style="color:var(--ink);font-weight:600">선택</b><span>이동</span><span>코멘트</span><span>|</span><span>100%</span></div>'+leftE()+'</div>'+rightE();
+}
+function viewC(){return topC()+queue()+'<div class="focus">'+focusC()+answerPanel()+'</div>'+dock()}
+
+/* ---------- render ---------- */
+function renderCtl(){
+  $('#lay').innerHTML=LAYS.map(function(l){return '<button role="tab" aria-selected="'+(S.layout===l[0])+'" class="'+(S.layout===l[0]?'on':'')+'" data-lay="'+l[0]+'"><b>'+l[3]+'안</b> · '+l[1]+'</button>'}).join('');
+  $('#tasks').innerHTML='<span>해볼 일</span>'+TASKS.map(function(t){return '<span class="t'+(S.done[t[0]]?' d':'')+'">'+(S.done[t[0]]?'✓':'○')+' '+t[1]+'</span>'}).join('')+'<button id="reset">처음부터</button>';
+}
+function render(){
+  var ae=document.activeElement,hadAsk=ae&&ae.id==='ask',pos=hadAsk?ae.selectionStart:0,hadVal=ae&&ae.id==='valin';
+  app.className='app'+((S.layout==='A'||S.layout==='E')?'':' dk');
+  app.innerHTML=(S.layout==='C'?viewC():S.layout==='D'?viewD():S.layout==='E'?viewE():S.layout==='B'?viewAB(true):viewAB(false))+(S.toast?'<div class="toast">'+esc(S.toast)+'</div>':'');
+  applyAI();renderCtl();
+  if(hadAsk){var a=document.getElementById('ask');if(a){a.focus();try{a.setSelectionRange(pos,pos)}catch(e){}}}
+  S.newIds={};S.emerge={};
+  fit();
+}
+function fit(){
+  var box=$('#fit'),w=box.clientWidth,sc=Math.min(1,w/1440);
+  app.style.transform='scale('+sc+')';box.style.height=(810*sc)+'px';
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',function(e){
+  var l=e.target.closest('[data-lay]');if(l){S.layout=l.getAttribute('data-lay');S.answer=null;S.tab='agent';render();return}
+  if(e.target.id==='reset'){var lay=S.layout;S=null;S=seed();S.layout=lay;render();return}
+  var t=e.target.closest('[data-act]');if(!t)return;
+  var a=t.getAttribute('data-act');
+  if(a==='mode'){S.mode=t.getAttribute('data-m');S.answer=null;if(S.layout!=='C')S.tab='agent';render()}
+  else if(a==='sel'){S.sel[S.mode]=t.getAttribute('data-id');if(S.mode==='check'){var dd=byId('check',S.sel.check);if(dd&&S.layout!=='A')S.screen=dd.scr;S.target='obj'}S.answer=null;if(S.layout!=='C')S.tab='detail';render()}
+  else if(a==='holdall'){holdAll()}
+  else if(a==='ltab'){S.leftTab=t.getAttribute('data-t');render()}
+  else if(a==='flt'){S.flt=t.getAttribute('data-f');render()}
+  else if(a==='scr'){S.screen=t.getAttribute('data-id');S.target='screen';S.answer=null;render()}
+  else if(a==='tab'){S.tab=t.getAttribute('data-t');render()}
+  else if(a==='chip'){ask(t.getAttribute('data-t'))}
+  else if(a==='send'){var el=document.getElementById('ask');ask(el?el.value:S.draft)}
+  else if(a==='apply'){var i=t.getAttribute('data-i');applyAct(t.getAttribute('data-key'),i==null?null:+i)}
+  else if(a==='close-ans'){S.answer=null;render()}
+  else if(a==='undo'){var id=t.getAttribute('data-id');if(S.changes[id]){S.changes[id]();delete S.changes[id];S.thread.forEach(function(x){if(x.id===id)x.undone=true});render()}}
+  else if(a==='step'){var o=cur();if(o&&o.val!=null){o.val=Math.max(0,o.val+(+t.getAttribute('data-d')));markEdit(o);render()}}
+  else if(a==='dec'){decide(t.getAttribute('data-k'))}
+  else if(a==='ddtog'){S.dd=!S.dd;render()}
+  else if(a==='ddsel'){S.mode=t.getAttribute('data-m');var ss=t.getAttribute('data-s');if(S.mode==='check'&&ss){S.screen=ss;S.target='screen'}S.dd=false;S.answer=null;render()}
+  else if(a==='gtog'){var gk=t.getAttribute('data-k');var gcur=S.gop[gk];var gl=convGroups().filter(function(g){return g.m===S.mode});var isLast=gl.length&&String(gl[gl.length-1].k)===gk;S.gop[gk]=(gcur===undefined?!isLast:!gcur);render()}
+  else if(a==='dvar'){var did=t.getAttribute('data-id');S.dv=(S.dv===did?'':did);S.emerge.dv=S.dv?1:0;render()}
+  else if(a==='vtab'){S.vtab[t.getAttribute('data-c')]=t.getAttribute('data-t');render()}
+  else if(a==='vtheme'){S.vtheme=t.getAttribute('data-k');render()}
+  else if(a==='vprop'){var k=t.getAttribute('data-k');S.vres.B=k;logChange('변경 사항',[[k==='prop'?'새 컴포넌트 제안':'보류','Range Calendar']],function(){S.vres.B=''});toast(k==='prop'?'새 컴포넌트 제안으로 보냄':'보류함');render()}
+  else if(a==='resp'){var k=t.getAttribute('data-k');if(k!=='pending')decide(k)}
+  else if(a.indexOf('d-')===0){
+    var k2=a.slice(2);
+    if(k2==='ok')decide('ok');
+    else if(k2==='hold')decide('hold');
+    else if(k2==='src'){var el2=document.getElementById('hlq2')||document.getElementById('hlq');if(el2){el2.classList.add('flash');setTimeout(function(){el2.classList.remove('flash')},900)}}
+    else if(k2==='fixbtn'){applyAct('fix',null)}
+    else if(k2==='dvar'){var o3=cur();S.dv=(S.dv===o3.id?'':o3.id);S.emerge.dv=S.dv?1:0;render()}
+    else if(k2==='memo'){var o2=cur();if(S.memos.indexOf(o2.id)<0)S.memos.push(o2.id);logChange('변경 사항',[['메모 저장',o2.n+' '+o2.name]],function(){S.memos=S.memos.filter(function(x){return x!==o2.id})});toast('메모 보드에 저장했어요')}
+    else if(k2==='first'){nextPending();S.tab='detail';render()}
+  }
+});
+function markEdit(o){if(o.state==='ai'||o.state==='confirmed'||o.state==='held'){var p=o.state;o.state='edited'}done('edit')}
+document.addEventListener('input',function(e){
+  if(e.target.id==='ask'){S.draft=e.target.value}
+  if(e.target.id==='valin'){var o=cur();if(o&&o.val!=null){var v=parseFloat(e.target.value);if(!isNaN(v)&&v!==o.val){o.val=v;markEdit(o);var p=e.target.selectionStart;renderKeep(e.target.id,p)}}}
+});
+function renderKeep(id,pos){render();var el=document.getElementById(id);if(el){el.focus();try{el.setSelectionRange(pos,pos)}catch(e){}}}
+document.addEventListener('keydown',function(e){
+  if(e.target.id==='ask'&&e.key==='Enter'){e.preventDefault();ask(e.target.value);return}
+  if(e.target.id==='valin'&&e.key==='Enter'){e.preventDefault();e.target.blur();return}
+  if(S.layout==='C'&&!/INPUT|TEXTAREA/.test(e.target.tagName)){
+    if(e.key==='Enter'&&!/BUTTON/.test(e.target.tagName)){e.preventDefault();decide('ok')}
+    if(e.key==='ArrowRight'){nextPending();render()}
+  }
+  if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();var a=document.getElementById('ask');if(a)a.focus()}
+});
+window.addEventListener('resize',fit);
+S=seed();render();
+})();
+</script>
+
+<script>
+/* ===== 자동 시연 (베스트 케이스) ===== */
+(function(){
+var Q=new URLSearchParams(location.search),SP=parseFloat(Q.get('speed')||'1')||1;
+var AUTO=Q.has('demo');
+var css='#dm{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);z-index:9999;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 16px;border-radius:999px;background:rgba(20,23,29,.92);color:#fff;font:500 15px/22px var(--font,sans-serif);box-shadow:0 12px 32px rgba(0,0,0,.28);max-width:min(1100px,94vw)}'
++'#dm .t{max-width:640px}#dm .s{font-size:13px;color:#A6BEFF;white-space:nowrap}#dm button{all:unset;white-space:nowrap;cursor:pointer;height:32px;min-width:32px;padding:0 10px;border-radius:16px;background:rgba(255,255,255,.12);text-align:center;font-size:13px;line-height:32px;box-sizing:border-box}#dm button:hover{background:rgba(255,255,255,.22)}'
++'#dm .dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3)}#dm .dot.on{background:#6C9BFF}'
++'#dcur{position:fixed;left:0;top:0;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;border:2px solid #fff;background:rgba(61,120,255,.55);box-shadow:0 0 0 1px rgba(0,0,0,.35),0 4px 12px rgba(0,0,0,.3);z-index:9998;pointer-events:none;transition:left .6s ease,top .6s ease,opacity .3s;opacity:0}'
++'#dcur.on{opacity:1}#dcur.p{transform:scale(.7);transition:left .6s ease,top .6s ease,transform .12s}'
++'#dcover{position:fixed;inset:0;z-index:9997;background:rgba(10,12,16,.55);display:none;align-items:center;justify-content:center;color:#fff;text-align:center;font:600 28px/40px var(--font,sans-serif)}#dcover small{display:block;font:400 16px/24px var(--font,sans-serif);color:#C9D2E8;margin-top:8px}'
++'body.demo #tasks{display:none}';
+var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
+var bar=document.createElement('div');bar.id='dm';document.body.appendChild(bar);
+var cur=document.createElement('div');cur.id='dcur';document.body.appendChild(cur);
+var cov=document.createElement('div');cov.id='dcover';document.body.appendChild(cov);
+document.body.classList.add('demo');
+var run=0,paused=false,playing=false,capText='',scIdx=0;
+function sleep(ms){return new Promise(function(r){var t0=Date.now(),need=ms/SP;(function tick(){if(paused){setTimeout(tick,120);t0+=120;return}if(Date.now()-t0>=need)r();else setTimeout(tick,40)})()})}
+function $(s,i){var l=document.querySelectorAll(s);i=i||0;if(i<0)i=l.length+i;return l[i]||null}
+async function idle(){var t0=Date.now();await sleep(250);while(Date.now()-t0<9000/SP){var a=document.getElementById('app');if(!a.querySelector('.aiw,.ai-think,.scr-think')&&!/분석 중…|AI가 읽는 중/.test(a.innerText))return;await sleep(200)}}
+async function waitSel(sel,i,ms){var t0=Date.now();while(Date.now()-t0<(ms||7000)/SP){var e=$(sel,i);if(e)return e;await sleep(150)}return null}
+async function moveTo(e){
+  var r=e.getBoundingClientRect();cur.classList.add('on');cur.style.left=(r.left+Math.min(r.width/2,60))+'px';cur.style.top=(r.top+r.height/2)+'px';await sleep(750)
+}
+async function click(sel,i,opt){
+  if(sel.indexOf('data-act="chip"')>=0)await idle();var e=await waitSel(sel,i,opt&&opt.wait);if(!e){console.warn('demo: miss',sel,i,'|',(document.getElementById('app').innerText||'').replace(/\n+/g,' / ').slice(0,260));return false}
+  try{e.scrollIntoView({block:'nearest'})}catch(x){}
+  await moveTo(e);cur.classList.add('p');await sleep(160);var e2=$(sel,i)||e;e2.click();cur.classList.remove('p');await sleep(260);if(sel.indexOf('data-act="chip"')>=0){await idle();await sleep(900)}return true;
+}
+function cap(t,sub){capText=t;render(sub)}
+var SC=[];
+function render(sub){
+  bar.innerHTML='<span class="t">'+capText+'</span><span class="s">'+(sub||'')+'</span>'+SC.map(function(s,i){return '<span class="dot'+(i===scIdx&&playing?' on':'')+'"></span>'}).join('')+'<button data-d="pp">'+(paused?'▶':'❚❚')+'</button><button data-d="prev">◀ 이전 안</button><button data-d="next">다음 안 ▶</button>';
+}
+bar.addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;var d=b.getAttribute('data-d');
+  if(d==='pp'){paused=!paused;render()}
+  if(d==='next')go(Math.min(scIdx+1,SC.length-1));
+  if(d==='prev')go(Math.max(scIdx-1,0));
+});
+async function reset(L){var r=document.getElementById('reset');if(r)r.click();await sleep(200);var b=$('[data-lay="'+L+'"]');if(b)b.click();await sleep(300);}
+function mk(L,name,fn){SC.push({L:L,name:name,fn:fn})}
+var CH=function(t){return '[data-act="chip"][data-t="'+t+'"]'};
+/* ---- A안 ---- */
+mk('A','A안 · Copilot',async function(){
+  cap('룰 · 인터뷰에서 뽑은 룰에 대해 AI에게 묻고, 직접 확정해요','A안 ①/3');await sleep(1200);
+  await click('.right '+CH('이 룰 예외 있어?'));
+  await click('.right [data-act="tab"][data-t="detail"]');await sleep(900);
+  await click('[data-act="d-ok"]');await sleep(1400);
+  cap('화면 점검 · 기획의도 점검을 돌리고, 수정안 보기를 눌러야 새 화면이 생겨요','A안 ②/3');
+  await click('[data-act="mode"][data-m="check"]');await sleep(900);
+  await click('.right '+CH('기획의도 점검'));
+  await click('.right [data-act="apply"]',-1);await sleep(2200);
+  cap('핀을 하나씩 눌러 “이 진단 배리에이션 보기”로 대안을 비교해요','A안 ②/3');
+  await click('.pin',0);await sleep(700);
+  await click('[data-act="d-dvar"]');await sleep(2600);
+  await click('.pin',1);await sleep(700);
+  await click('[data-act="d-dvar"]');await sleep(2600);
+  cap('디자인 시스템 · 기획 요청이 오면 변형안을 만들고 룰 적합 여부를 판단해요','A안 ③/3');
+  await click('[data-act="mode"][data-m="system"]');await sleep(900);
+  await click('.li[data-id="s5"]');await sleep(900);
+  await click('.right [data-act="tab"][data-t="agent"]');await sleep(500);await click('.right '+CH('/변형 제안'));
+  await click('[data-act="vtab"][data-c="A"][data-t="spec"]');await sleep(1400);
+  await click('[data-act="vtab"][data-c="B"][data-t="tok"]');await sleep(1400);
+  await click('[data-act="vtheme"][data-k="dark"]');await sleep(1800);
+  await click('.right [data-act="tab"][data-t="detail"]');await sleep(800);
+  await click('[data-act="d-ok"]');await sleep(1800);
+});
+/* ---- B안 ---- */
+mk('D','B안 · Dialogue',async function(){
+  cap('룰 · 대화로 묻고 → 오른쪽 카드에서 확정해요','B안 ①/3');await sleep(1200);
+  await click('.sug '+CH('이 룰 예외 있어?'));
+  await click('.rc.on [data-act="dec"][data-k="ok"]');await sleep(1400);
+  cap('화면 점검 · /점검 → 기획의도 점검 → 수정안 보기','B안 ②/3');
+  await click('[data-act="mode"][data-m="check"]');await sleep(900);
+  await click('.sug '+CH('/점검'));
+  await click('.sug '+CH('기획의도 점검'));
+  await click('.chatp [data-act="apply"]',-1);await sleep(2200);
+  cap('핀마다 “이 진단 배리에이션 보기”','B안 ②/3');
+  await click('.pin',0);await sleep(700);
+  await click('[data-act="dvar"]');await sleep(2600);
+  await click('.pin',1);await sleep(700);
+  await click('[data-act="dvar"]');await sleep(2600);
+  cap('디자인 시스템 · 변형안 2개 + 룰 적합 여부','B안 ③/3');
+  await click('[data-act="mode"][data-m="system"]');await sleep(900);
+  await click('.rc[data-id="s5"]');await sleep(900);
+  await click('.sug '+CH('/변형 제안'));
+  await click('[data-act="vtab"][data-c="A"][data-t="spec"]');await sleep(1400);
+  await click('[data-act="vtab"][data-c="B"][data-t="tok"]');await sleep(1400);
+  await click('[data-act="vtheme"][data-k="dark"]');await sleep(1800);
+  await click('.rc.on [data-act="dec"][data-k="ok"]');await sleep(1800);
+});
+/* ---- C안 ---- */
+mk('C','C안 · Triage',async function(){
+  cap('룰 · 대기 큐에서 한 건씩 → 하단 결정 바로 확정해요','C안 ①/3');await sleep(1200);
+  await click('.dock '+CH('이 룰 예외 있어?'));
+  await click('[data-act="close-ans"]');await sleep(600);
+  await click('.dec [data-act="dec"][data-k="ok"]');await sleep(1400);
+  cap('화면 점검 · /점검 → 기획의도 점검 → 수정안 보기','C안 ②/3');
+  await click('[data-act="mode"][data-m="check"]');await sleep(900);
+  await click('.dock '+CH('/점검'));
+  await click('[data-act="close-ans"]');await sleep(600);
+  await click('.dock '+CH('기획의도 점검'));
+  await click('.apanel [data-act="apply"]');await sleep(2200);
+  cap('대기 큐 항목마다 “이 진단 배리에이션 보기”','C안 ②/3');
+  await click('.qi',1);await sleep(900);
+  await click('[data-act="dvar"]');await sleep(2800);
+  await click('.qi',2);await sleep(900);
+  await click('[data-act="dvar"]');await sleep(2800);
+  cap('디자인 시스템 · 변형안 2개 + 룰 적합 여부','C안 ③/3');
+  await click('[data-act="mode"][data-m="system"]');await sleep(900);
+  await click('.qi[data-id="s5"]');await sleep(900);
+  await click('.dock '+CH('/변형 제안'));
+  await click('[data-act="close-ans"]');await sleep(500);
+  await click('[data-act="vtab"][data-c="A"][data-t="spec"]');await sleep(1400);
+  await click('[data-act="vtab"][data-c="B"][data-t="tok"]');await sleep(1400);
+  await click('[data-act="vtheme"][data-k="dark"]');await sleep(1800);
+  await click('.dec [data-act="dec"][data-k="ok"]');await sleep(1800);
+});
+async function title(L,name,sub){
+  cov.style.display='flex';cov.innerHTML='<div>'+name+'<small>'+sub+'</small></div>';await sleep(1800);cov.style.display='none';
+}
+async function go(i){
+  run++;var my=run;scIdx=i;playing=true;
+  var sc=SC[i];
+  try{
+    cur.classList.remove('on');
+    await title(sc.L,sc.name,i===0?'배운다 · 점검한다 · 쌓는다 · AI는 제안하고 사람이 확정해요':'같은 흐름을 다른 구조로');
+    if(my!==run)return;
+    await reset(sc.L);render();
+    await Promise.race([sc.fn(),new Promise(function(_,rj){var iv=setInterval(function(){if(my!==run){clearInterval(iv);rj('x')}},100)})]);
+    if(my!==run)return;
+    if(i<SC.length-1){go(i+1)}
+    else{cur.classList.remove('on');cap('끝 · A/B/C안 흐름을 모두 보여드렸어요','다시 보려면 ◀ 이전 안');playing=false;render()}
+  }catch(e){if(e!=='x')console.error(e)}
+}
+window.__demo={start:function(i){go(i||0)},sc:SC};
+render();
+if(AUTO){setTimeout(function(){go(0)},600)}
+else{
+  var hb=document.createElement('button');hb.textContent='▶ 자동 시연';hb.style.cssText='position:fixed;right:18px;top:16px;z-index:50;border:0;border-radius:999px;background:#14171D;color:#fff;padding:8px 16px;font:500 14px var(--font,sans-serif);cursor:pointer';hb.onclick=function(){hb.remove();go(0)};document.body.appendChild(hb);
+  bar.style.display='none';
+  hb.addEventListener('click',function(){bar.style.display='flex'});
+}
+})();
+
+</script>
+</body></html>
